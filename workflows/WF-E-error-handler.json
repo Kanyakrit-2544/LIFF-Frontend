@@ -1,0 +1,123 @@
+{
+  "id": "wfe-error-handler",
+  "name": "WF-E — Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $json;\nconst redactString = (v) => String(v ?? '')\n  .replace(/\\+?66[-\\s]?\\d{1,2}[-\\s]?\\d{3}[-\\s]?\\d{4}\\b/g, '[PHONE]')\n  .replace(/\\b0\\d{1,2}[-\\s]?\\d{3}[-\\s]?\\d{4}\\b/g, '[PHONE]')\n  .replace(/\\b[^\\s@,;]+@[^\\s@,;]+\\.[a-z]{2,}\\b/gi, '[EMAIL]')\n  .replace(/Bearer\\s+[^\\s]+/gi, 'Bearer [REDACTED]')\n  .replace(/U[a-fA-F0-9]{20,}/g, '[LINE_USER]');\nreturn [{ json: { payload: { executionId: src.execution?.id ?? null, workflow: src.workflow?.name ?? 'unknown', node: src.execution?.lastNodeExecuted ?? null, message: redactString(src.error?.message ?? 'n8n execution failed') } } }];"
+      },
+      "id": "redact-error",
+      "name": "Redact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst body = JSON.stringify($json.payload);\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type': 'application/json', 'x-signature': signature, 'x-timestamp': String(ts) } } }];"
+      },
+      "id": "sign-log",
+      "name": "Sign Log Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE}}/api/internal/logs/n8n-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{$json.headers['content-type']}}"
+            },
+            {
+              "name": "x-signature",
+              "value": "={{$json.headers['x-signature']}}"
+            },
+            {
+              "name": "x-timestamp",
+              "value": "={{$json.headers['x-timestamp']}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}"
+      },
+      "id": "log-error",
+      "name": "Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Redact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redact": {
+      "main": [
+        [
+          {
+            "node": "Sign Log Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Log Request": {
+      "main": [
+        [
+          {
+            "node": "Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "active": false,
+  "versionId": "s4-template",
+  "meta": {
+    "description": "S4 error workflow: redact locally, then log through HMAC-protected internal API."
+  }
+}

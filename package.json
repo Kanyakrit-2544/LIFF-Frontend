@@ -1,0 +1,28 @@
+{
+  "name": "line-crm",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "create-indexes": "tsx --env-file=apps/web/.env.local scripts/create-indexes.ts",
+    "check-env": "tsx --env-file=apps/web/.env.local scripts/check-env.ts",
+    "db:test:up": "docker run -d --name line-crm-mongo -p 27018:27017 mongo:7 --replSet rs0 --bind_ip_all && sleep 4 && docker exec line-crm-mongo mongosh --quiet --eval \"rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})\"",
+    "db:test:down": "docker rm -f line-crm-mongo",
+    "n8n:up": "docker compose up -d",
+    "n8n:down": "docker compose down",
+    "n8n:logs": "docker compose logs -f n8n",
+    "smoke:line": "tsx --env-file=apps/web/.env.local scripts/smoke-line-webhook.ts",
+    "smoke:s4": "tsx --env-file=apps/web/.env.local scripts/smoke-s4.ts",
+    "seed:form": "tsx --env-file=apps/web/.env.local scripts/seed-form-schema.ts",
+    "env:vercel": "tsx scripts/make-vercel-env.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

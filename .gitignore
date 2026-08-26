@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+.n8n-data/
+.venv/
+_maps/
+input_ai_placeholder/
+output_from_ai_placeholder/
+Reverse_Data/
+raw input/
+.DS_Store
+*.log
+coverage/
+
+.next/
+.vercel/
+next-env.d.ts
+
+vercel.env.txt
+.vercel
+.env*

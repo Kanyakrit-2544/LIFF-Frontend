@@ -1,0 +1,92 @@
+# LINE CRM Integration Platform — POC → Production
+
+ระบบเก็บข้อมูลลูกค้าจาก LINE OA / LIFF เข้าสู่ MongoDB และแสดงผลใน Google Sheets
+ออกแบบให้ขยายไป Meta / Facebook API และ AI Pipeline ได้โดยไม่ต้องรื้อระบบ
+
+```
+LINE OA ──webhook──> Vercel ──> MongoDB (Source of Truth)
+                        │            ↑
+LINE User ──> LIFF ──> Vercel ───────┘
+                        │
+                        └──> n8n ──> Google Sheets (Operational View)
+```
+
+## เอกสาร
+
+| # | เอกสาร | เนื้อหา |
+|---|---|---|
+| 00 | [Requirements & Risks](docs/00-requirements-risks.md) | สรุป requirement, ข้อที่ยังไม่ชัด, assumption, technical risk 8 ข้อ |
+| 01 | [Architecture](docs/01-architecture.md) | component diagram, data flow A–D, responsibility matrix, API boundary |
+| 02 | [Database Design](docs/02-database.md) | 8 collections, index, identity strategy, merge algorithm, PII pattern |
+| 03 | [API Design](docs/03-api.md) | endpoint map, request/response schema, env vars, rate limit |
+| 04 | [n8n Workflows](docs/04-n8n-workflows.md) | WF-A ถึง WF-F แบบ node-by-node, idempotency matrix |
+| 05 | [Project Structure](docs/05-project-structure.md) | โครง monorepo + ลำดับ implement S1–S11 |
+| 06 | [Testing Checklist](docs/06-testing.md) | 90+ เคส ครอบคลุม security, duplicate, merge, recovery |
+| 07 | [Local Dev Setup](docs/07-local-dev.md) | n8n บน Docker → pull mode, docker-compose, checklist ขึ้น prod |
+| 08 | [LIFF Fields & Sheets](docs/08-liff-fields-and-sheets.md) | โครงสร้าง field ลูกค้า, ร่างฟอร์ม LIFF, layout Google Sheets |
+| 09 | [PII Service](docs/09-pii-service.md) | แกะ scrubber/restore เดิม (Presidio) เป็น service — **อยู่ใน critical path ของ WF-C** |
+| 10 | [MongoDB Compression](docs/10-mongodb-compression.md) | network + storage compression, ตัวเลขวัดจริง |
+| 11 | [S2 — LINE Webhook](docs/11-s2-webhook.md) | inbound outbox, idempotency, ผลทดสอบ end-to-end |
+| 12 | [S3 — Customer Identity (รีวิว)](docs/12-s3-review.md) | resolve/merge/upsert + บั๊ก 4 จุดที่แก้ |
+| 13 | [S4 — สเปกงาน](docs/13-s4-spec.md) | n8n WF-A: endpoint ที่ต้องสร้าง, workflow node-by-node, เกณฑ์ผ่านงาน |
+| 15 | [S4 — ผลรีวิว](docs/15-s4-review.md) | บั๊ก 8 จุดที่เจอตอนรัน n8n จริง + ผลทดสอบ |
+| 16 | [S5 — LIFF Auth + Form Schema](docs/16-s5-liff-auth.md) | id_token verify, session cookie, form schema จาก DB |
+| 17 | [S6+S7 — หน้า LIFF + รับข้อมูล](docs/17-s6-s7-liff-form.md) | UI, merge, idempotency, ผลทดสอบจริง |
+| 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
+
+## Design Decisions (ยืนยันแล้ว)
+
+| # | ประเด็น | ตัดสินใจ |
+|---|---|---|
+| D1 | Sheets sync latency | รับได้ 0–2 นาที → ใช้ batch reconcile ทุก 2 นาที |
+| D2 | ทิศทาง Sheets | **One-way เท่านั้น** (Mongo → Sheets) พนักงานไม่แก้กลับ |
+| D3 | Customer merge | **Auto-merge** เมื่อ `phoneHash` ตรง (ไม่ต้องให้คนกดยืนยัน) |
+| D4 | เก็บบทสนทนา | **ไม่เก็บ** — บันทึกเฉพาะ `follow` + `first_message` เท่านั้น, redact ข้อความตั้งแต่ webhook |
+| D5 | PDPA consent | **จำเป็น** — มี consent object + หลักฐานการยินยอม |
+| D6 | ลำดับ implement | S1 → S11 ตาม docs/05 |
+| D7 | n8n dev | Docker บนเครื่อง + **pull mode** (ไม่ต้อง host, ไม่ต้อง tunnel) |
+| D8 | n8n prod | Cloud-hosted — เปลี่ยนแค่ `N8N_PUSH_ENABLED=true` |
+| D9 | Privacy layer | `Mongo → scrub → AI → restore → Sheets` — `services/pii` อยู่ใน critical path |
+| D10 | หน้าที่ AI | บันทึกข้อมูลจาก LIFF ลงชีต โดย **match กับ Column ID** — ตัดสินเฉพาะเนื้อหา ไม่ตัดสินว่าเขียนแถวไหน |
+| D11 | AI model | **OpenAI / ChatGPT** (n8n OpenAI node) |
+| D12 | restore ก่อนเขียนชีต | ✅ ต้อง restore — พนักงานเห็นข้อมูลจริง |
+| D13 | flow LINE ผ่าน AI ไหม | ❌ ไม่ผ่าน — follow/first_message ไม่มี free text |
+| D14 | deploy `services/pii` | **container แยก** จำลองให้เหมือน production |
+| D15 | เบอร์/อีเมล ในชีต | **แสดงเต็ม ไม่ mask** (`SHEETS_PII_MODE=full`) |
+| D16 | อายุ | เก็บ **`birthYear` เป็น พ.ศ.** ลูกค้ากรอกเอง (LINE ไม่มี API วันเกิด) |
+| D17 | FB / IG | แยก 3 ช่องจาก LINE — ไม่บังคับกรอก |
+| D18 | Email จาก LINE | **ยื่นขอ Email permission** — ได้แล้ว prefill ให้, ไม่ได้ก็ให้กรอกเอง |
+| D19 | MongoDB compression | network `zstd,zlib` ✅ ใช้งานได้ · block compressor `zstd` ⚠️ Atlas shared tier ไม่อนุญาต → ได้ snappy (docs/10) |
+| D20 | ข้อความต้อนรับตอน follow | **ยังไม่ส่ง** — รอ S6 ที่มีปุ่มเปิดฟอร์ม LIFF |
+| D21 | ปลายทาง alert เวลาระบบพัง | **เก็บ log ในระบบ** ยังไม่ต่อช่องทางภายนอก |
+| D22 | ค่าของ `channelId` | ใช้ `destination` จาก LINE webhook body |
+
+## สถานะ
+
+- [x] Phase 0 — Requirement analysis + risk
+- [x] Phase 1 — Architecture
+- [x] Phase 2 — Database design
+- [x] Phase 3 — API design
+- [x] Phase 4 — n8n workflow design
+- [x] **S1 — `packages/core` + create-indexes** ✅
+- [x] **S2 — `/api/webhook/line` + inbound_events + `/api/health`** ✅
+- [x] **S3 — identity resolve + upsertFromLine + internal API** ✅ 86 tests ผ่าน (รีวิว+แก้บั๊ก 4 จุด)
+- [x] **S4 — n8n WF-A + internal event queue APIs** ✅
+- [x] **S5 — LIFF session + bootstrap + form_schemas** ✅ 145 tests ผ่าน
+- [x] **S6+S7 — หน้า LIFF + รับข้อมูลเข้าระบบ + merge** ✅ 159 tests ผ่าน
+- [ ] Phase 5 — Implementation (S8 → S11)
+- [ ] Phase 6 — Testing
+
+## ขอบเขตงานนี้
+
+เก็บข้อมูลลูกค้าจาก **การแอดเพื่อน + การทักครั้งแรก** → LIFF form → MongoDB → Google Sheets
+
+**นอกสโคป (ไว้คิดทีหลัง):** ประวัติการซื้อ/คอร์ส, ข้อมูลการเงิน, ใบกำกับภาษี, การ import ไฟล์ลูกค้าเดิม
+
+## สิ่งที่ยังต้องการจากเจ้าของโปรเจกต์
+
+1. ยืนยัน[ร่างฟอร์ม LIFF](docs/08-liff-fields-and-sheets.md) — เพิ่ม/ตัด/เปลี่ยน field ได้
+2. LINE Login channel สำหรับ LIFF (Messaging API dev มีค่า local แล้ว)
+3. **`NEXT_PUBLIC_LIFF_ID`** + **LINE Login Channel ID ตัวจริง** (ตอนนี้ซ้ำกับ Messaging API channel — ดู docs/16 §16.5)
+4. เพิ่ม env vars ใน **Vercel** — local (`apps/web/.env.local`) ครบแล้ว แต่ Vercel project ยังว่าง
+4. ตั้ง LINE webhook URL ชี้ Vercel deployment + ปิด auto-reply

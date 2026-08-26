@@ -1,0 +1,11 @@
+services:
+  n8n:
+    environment:
+      # สร้างด้วย: openssl rand -base64 32
+      - N8N_ENCRYPTION_KEY=
+      # ใช้ค่าเดียวกับ apps/web/.env.local
+      - INTERNAL_HMAC_SECRET=
+      # dev ถ้า Next ใช้พอร์ตอื่นให้แก้ตรงนี้
+      - API_BASE=http://host.docker.internal:3000
+      # ใส่ในเครื่องตัวเองเท่านั้น ห้าม commit ค่าจริง
+      - LINE_CHANNEL_ACCESS_TOKEN=

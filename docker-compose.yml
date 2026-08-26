@@ -1,0 +1,33 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: line-crm-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - GENERIC_TIMEZONE=Asia/Bangkok
+      - TZ=Asia/Bangkok
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+      - N8N_DIAGNOSTICS_ENABLED=false
+      # Code node ต้องใช้ crypto เซ็น HMAC — task runner ของ n8n บล็อก Node builtin ไว้โดย default
+      # ไม่ใส่บรรทัดนี้ = ทุก Code node ที่เซ็น signature พังหมด ("Module 'crypto' is disallowed")
+      - NODE_FUNCTION_ALLOW_BUILTIN=crypto
+      # workflow อ่าน $env.INTERNAL_HMAC_SECRET / $env.API_BASE — n8n บล็อกไว้โดย default
+      # ("access to env vars denied") ไม่ปลดตรงนี้ = workflow ทำงานไม่ได้เลย
+      # ⚠️ ข้อแลกเปลี่ยน: Code node ทุกตัวจะอ่าน env ได้หมด — รับได้เพราะ n8n ตัวนี้ใช้คนเดียว
+      #    ถ้าเปิดให้หลายคนแก้ workflow ควรย้ายไปใช้ n8n Credentials แทน $env
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - API_BASE=${API_BASE:-http://host.docker.internal:3000}
+      - INTERNAL_HMAC_SECRET=${INTERNAL_HMAC_SECRET}
+      - LINE_CHANNEL_ACCESS_TOKEN=${LINE_CHANNEL_ACCESS_TOKEN}
+    volumes:
+      - ./.n8n-data:/home/node/.n8n
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

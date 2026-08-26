@@ -1,0 +1,211 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const jar = new Map<string, string>();
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (k: string) => (jar.has(k) ? { name: k, value: jar.get(k)! } : undefined),
+    set: (k: string, v: string) => void jar.set(k, v),
+    delete: (k: string) => void jar.delete(k),
+  }),
+}));
+
+const core = await import("@line-crm/core");
+const { closeClient, COLLECTIONS, ensureIndexes, getDb, upsertSchema, createSession, SESSION_COOKIE, packPhone, normalizePhone, newCustomerId } = core;
+const { POST: submit } = await import("../app/api/liff/customer/profile/route");
+
+const runIntegration = process.env.RUN_MONGO_INTEGRATION === "true";
+const runId = `s7-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+const FORM_ID = "customer_onboarding";
+const VER = `t-${runId}`;
+let available = false;
+let customerId = "";
+
+const req = (body: unknown, key = `k-${runId}-${Math.random()}`) =>
+  new Request("http://localhost/api/liff/customer/profile", {
+    method: "POST",
+    headers: { "content-type": "application/json", "idempotency-key": key },
+    body: JSON.stringify({ formId: FORM_ID, formVersion: VER, idempotencyKey: key, ...(body as object) }),
+  });
+
+const answers = (over: Record<string, unknown> = {}) => ({
+  answers: { fullNameTh: "สมชาย ใจดี", phone: "0812345678", consentDataProcessing: true, ...over },
+});
+
+async function makeCustomer(): Promise<string> {
+  const id = newCustomerId();
+  await (await getDb()).collection(COLLECTIONS.customers).insertOne({
+    _id: id, status: "active", mergedInto: null, displayName: null, nickname: null, fullNameEn: null,
+    birthYear: null, lineDisplayName: `LINE ${runId}`, pictureUrl: null, facebook: null, instagram: null,
+    phone: null, email: null, phoneHash: null, emailHash: null, customerStatus: "lead", tags: [],
+    source: { channel: "line", campaign: null }, sources: ["line"], consent: null, profileRef: null,
+    sheetSync: { dirty: false, rowKey: id, syncedAt: null, lockedAt: null, attempts: 0 },
+    counters: { milestones: 0, formSubmits: 0 }, firstInteractionAt: new Date(), firstMessageAt: null,
+    lastInteractionAt: new Date(), createdAt: new Date(), updatedAt: new Date(), schemaVersion: 1,
+  } as never);
+  return id;
+}
+
+beforeAll(async () => {
+  if (!runIntegration) { console.warn("\n⚠️  ข้าม S7 test — ตั้ง RUN_MONGO_INTEGRATION=true\n"); return; }
+  const db = await getDb();
+  await db.command({ ping: 1 });
+  await ensureIndexes(db);
+  await upsertSchema({
+    _id: `${FORM_ID}@${VER}`, formId: FORM_ID, version: VER, status: "published",
+    title: { th: "ทดสอบ" }, createdAt: new Date(), publishedAt: new Date(),
+    sections: [{ id: "s", title: { th: "s" }, fields: [
+      { id: "fullNameTh", type: "text", label: { th: "ชื่อ" }, validate: { required: true } },
+      { id: "nickname", type: "text", label: { th: "ชื่อเล่น" } },
+      { id: "phone", type: "tel", label: { th: "เบอร์" }, validate: { required: true } },
+      { id: "email", type: "email", label: { th: "อีเมล" } },
+      { id: "consentDataProcessing", type: "consent", label: { th: "ยินยอม" }, validate: { required: true } },
+      { id: "consentMarketing", type: "consent", label: { th: "ข่าวสาร" } },
+    ] }],
+  });
+  available = true;
+}, 30_000);
+
+beforeEach(async () => {
+  if (!available) return;
+  jar.clear();
+  await cleanup();
+  customerId = await makeCustomer();
+  jar.set(SESSION_COOKIE, createSession({ customerId, lineUserId: `U${runId}`, channelId: "2011263761" }));
+});
+
+afterAll(async () => {
+  if (available) {
+    await cleanup();
+    await (await getDb()).collection(COLLECTIONS.formSchemas).deleteMany({ version: VER });
+  }
+  await closeClient();
+});
+
+async function cleanup() {
+  const db = await getDb();
+  const cs = await db.collection(COLLECTIONS.customers).find({ lineDisplayName: `LINE ${runId}` }).toArray();
+  const ids = cs.map((c) => c._id as unknown as string);
+  await Promise.all([
+    db.collection(COLLECTIONS.customers).deleteMany({ lineDisplayName: `LINE ${runId}` }),
+    ids.length ? db.collection(COLLECTIONS.customerProfiles).deleteMany({ customerId: { $in: ids } }) : Promise.resolve(),
+    ids.length ? db.collection(COLLECTIONS.interactions).deleteMany({ customerId: { $in: ids } }) : Promise.resolve(),
+    db.collection(COLLECTIONS.auditLogs).deleteMany({ actor: "liff:form_submit" }),
+  ]);
+}
+
+describe.runIf(() => available)("POST /api/liff/customer/profile", () => {
+  it("ไม่มี session → 401", async () => {
+    jar.clear();
+    expect((await submit(req(answers()))).status).toBe(401);
+  });
+
+  it("ส่งครบ → 200, revision 1, เขียนลง customers", async () => {
+    const res = await submit(req(answers()));
+    const j = await res.json();
+    expect(res.status).toBe(200);
+    expect(j.revision).toBe(1);
+
+    const c = await (await getDb()).collection(COLLECTIONS.customers).findOne({ _id: customerId } as never);
+    expect(c?.displayName).toBe("สมชาย ใจดี");
+    expect(c?.phoneHash).toBeTruthy();
+    expect(c?.sheetSync.dirty).toBe(true);
+    expect(c?.consent?.dataProcessing).toBe(true);
+    expect(c?.counters.formSubmits).toBe(1);
+  });
+
+  it("⭐ เก็บเบอร์เป็น hash + enc ไม่มี plaintext ใน field ที่ index", async () => {
+    await submit(req(answers()));
+    const c = await (await getDb()).collection(COLLECTIONS.customers).findOne({ _id: customerId } as never);
+    expect(JSON.stringify(c?.phoneHash)).not.toContain("0812345678");
+    expect(c?.phone?.enc).toMatch(/^v1:/);
+    expect(c?.phone?.masked).toBe("08x-xxx-5678");
+  });
+
+  it("ขาด required → 400 พร้อมชื่อ field", async () => {
+    const res = await submit(req(answers({ fullNameTh: "" })));
+    expect(res.status).toBe(400);
+    const j = await res.json();
+    expect(j.error.details.some((d: { field: string }) => d.field === "fullNameTh")).toBe(true);
+  });
+
+  it("ไม่ติ๊กยินยอม → 400", async () => {
+    expect((await submit(req(answers({ consentDataProcessing: false })))).status).toBe(400);
+  });
+
+  it("เบอร์ผิดรูปแบบ → 400", async () => {
+    expect((await submit(req(answers({ phone: "123" })))).status).toBe(400);
+  });
+
+  it("⭐ field แปลกปลอมถูกปฏิเสธ (mass assignment)", async () => {
+    const res = await submit(req(answers({ customerStatus: "vip", isAdmin: true })));
+    expect(res.status).toBe(400);
+    const c = await (await getDb()).collection(COLLECTIONS.customers).findOne({ _id: customerId } as never);
+    expect(c?.customerStatus).toBe("lead");
+  });
+
+  it("⭐ customerId ใน body ไม่มีผล — ใช้จาก session", async () => {
+    const other = await makeCustomer();
+    await submit(req({ ...answers(), customerId: other }));
+    const mine = await (await getDb()).collection(COLLECTIONS.customers).findOne({ _id: customerId } as never);
+    const theirs = await (await getDb()).collection(COLLECTIONS.customers).findOne({ _id: other } as never);
+    expect(mine?.displayName).toBe("สมชาย ใจดี");
+    expect(theirs?.displayName).toBeNull();
+  });
+
+  it("⭐ กดส่งรัว ๆ ด้วย key เดิม → มี profile เดียว", async () => {
+    const key = `dup-${runId}`;
+    const [a, b, c] = await Promise.all([submit(req(answers(), key)), submit(req(answers(), key)), submit(req(answers(), key))]);
+    expect([a.status, b.status, c.status].every((s) => s === 200)).toBe(true);
+    expect(await (await getDb()).collection(COLLECTIONS.customerProfiles).countDocuments({ customerId })).toBe(1);
+  });
+
+  it("ส่งครั้งที่สอง (คนละ key) → revision 2, ของเดิมยังอยู่", async () => {
+    await submit(req(answers()));
+    const j = await (await submit(req(answers({ nickname: "ชาย" })))).json();
+    expect(j.revision).toBe(2);
+    expect(await (await getDb()).collection(COLLECTIONS.customerProfiles).countDocuments({ customerId })).toBe(2);
+  });
+
+  it("formVersion ที่ไม่มีอยู่ → 404", async () => {
+    const res = await submit(new Request("http://localhost/x", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ formId: FORM_ID, formVersion: "ไม่มีจริง", idempotencyKey: "k404", ...answers() }),
+    }));
+    expect(res.status).toBe(404);
+  });
+
+  it("⭐ เบอร์ตรงกับลูกค้าเดิม → merge ไม่สร้างข้อมูลซ้ำ", async () => {
+    const db = await getDb();
+    const old = await makeCustomer();
+    const p = packPhone(normalizePhone("0812345678")!);
+    await db.collection(COLLECTIONS.customers).updateOne({ _id: old } as never, {
+      $set: { phoneHash: p.hash, phone: p, displayName: "ลูกค้าเก่า", createdAt: new Date(Date.now() - 86400000) },
+    });
+
+    const j = await (await submit(req(answers()))).json();
+    expect(j.merged).toBe(true);
+
+    const winner = await db.collection(COLLECTIONS.customers).findOne({ _id: j.customerId } as never);
+    expect(winner?.status).toBe("active");
+    const loserId = j.customerId === old ? customerId : old;
+    const loser = await db.collection(COLLECTIONS.customers).findOne({ _id: loserId } as never);
+    expect(loser?.status).toBe("merged");
+    expect(loser?.mergedInto).toBe(j.customerId);
+
+    // audit ต้องบันทึกไว้ให้ย้อนดูได้
+    expect(await db.collection(COLLECTIONS.auditLogs).countDocuments({ action: "customer.merge" })).toBeGreaterThan(0);
+  });
+
+  it("สร้าง interaction form_submit", async () => {
+    await submit(req(answers()));
+    const n = await (await getDb()).collection(COLLECTIONS.interactions).countDocuments({ customerId, type: "form_submit" });
+    expect(n).toBe(1);
+  });
+
+  it("normalize เบอร์เป็น E.164 และอีเมลตัวพิมพ์เล็ก", async () => {
+    await submit(req(answers({ phone: "081-234-5678", email: " A@B.COM " })));
+    const prof = await (await getDb()).collection(COLLECTIONS.customerProfiles).findOne({ customerId });
+    expect(prof?.answers.phone).toBe("+66812345678");
+    expect(prof?.answers.email).toBe("a@b.com");
+  });
+});
