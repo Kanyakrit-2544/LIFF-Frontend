@@ -115,7 +115,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const rows = $('Claim Customers').first().json.rows || [];\nreturn rows.map((r) => ({ json: { ...r.customer, customerId: r.customerId } }));"
+        "jsCode": "// n8n MongoDB node จะ cast _id เป็น ObjectId เสมอ\n// แต่ _id ของเราเป็น \"cus_01M11...\" (ULID) → cast ไม่ได้ → \"input must be a 24 character hex string\"\n// จึงใช้ customerId เป็นกุญแจแทน แล้วไม่ส่ง _id ไปเลย\nconst rows = $('Claim Customers').first().json.rows || [];\nreturn rows.map((r) => {\n  const { _id, ...rest } = r.customer || {};\n  return { json: { customerId: r.customerId, ...rest } };\n});"
       },
       "id": "prepare-upserts",
       "name": "Prepare Upserts",
@@ -130,8 +130,12 @@
       "parameters": {
         "operation": "update",
         "collection": "customers_scrubbed",
-        "updateKey": "_id",
-        "fields": "={{ JSON.stringify($json) }}"
+        "updateKey": "customerId",
+        "fields": "status,mergedInto,displayName,nickname,fullNameEn,phone,email,phoneHash,emailHash,birthYear,province,customerStatus,tags,sources,consentMarketing,firstInteractionAt,firstMessageAt,formSubmittedAt,syncedAt,sourceUpdatedAt",
+        "upsert": true,
+        "options": {
+          "upsert": true
+        }
       },
       "id": "upsert-ai-db",
       "name": "Upsert AI DB",
@@ -141,12 +145,6 @@
         1000,
         0
       ],
-      "credentials": {
-        "mongoDb": {
-          "id": "__SET_IN_N8N_UI__",
-          "name": "mirror_user line_crm_ai"
-        }
-      },
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000

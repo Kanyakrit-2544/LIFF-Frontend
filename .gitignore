@@ -29,3 +29,5 @@ google-service-account.json
 
 # build cache
 *.tsbuildinfo
+
+SECRETS.local.md
