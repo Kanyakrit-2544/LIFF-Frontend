@@ -90,7 +90,7 @@ services/pii/
 
 **1. `.map.json` เก็บค่าจริงเป็น plaintext**
 ไฟล์นี้คือ "กุญแจ" ที่ถอด PII กลับได้ทั้งหมด วางไว้ข้าง ๆ ไฟล์ที่ scrub แล้ว — ถ้าเผลอ zip ทั้งโฟลเดอร์ส่งให้ใคร = ข้อมูลรั่วทั้งชุด
-→ **service ต้องเก็บ `valueEnc` (AES-256-GCM) เท่านั้น** และ `PII_KEY` อยู่คนละที่กับ database
+→ ถ้ากลับมา build restore flow จริง service ต้องเก็บ `valueEnc` (AES-256-GCM) เท่านั้น และใช้ key เฉพาะ service แยกจาก database/app env ปัจจุบัน
 
 **2. Salt อยู่ในไฟล์เดียวกับ map**
 `_maps/.salt` — ใครอ่าน map ได้ก็อ่าน salt ได้ → brute-force ค่าที่เดาง่าย (เบอร์โทรมีแค่ ~10^8 แบบ) ได้

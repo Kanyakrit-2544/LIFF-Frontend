@@ -4,8 +4,8 @@ import { COLLECTIONS, type CustomerDoc, type IdentityDoc, type IdentityProvider 
 import { newCustomerId, newIdentityId } from "../ids";
 
 export interface ResolveHints {
-  phoneHash?: string | null;
-  emailHash?: string | null;
+  phone?: string | null;
+  email?: string | null;
 }
 
 export interface CustomerCreateInput {
@@ -74,8 +74,6 @@ function buildNewCustomer(customerId: string, input: ResolveCustomerInput): Cust
     instagram: null,
     phone: null,
     email: null,
-    phoneHash: null,
-    emailHash: null,
     customerStatus: "lead",
     tags,
     source: { channel: sourceChannel, campaign: null },
@@ -84,6 +82,7 @@ function buildNewCustomer(customerId: string, input: ResolveCustomerInput): Cust
     profileRef: null,
     pendingMerge: null,
     sheetSync: { dirty: true, rowKey: customerId, syncedAt: null, lockedAt: null, attempts: 0 },
+    aiSync: { dirty: true, syncedAt: null, lockedAt: null, attempts: 0 },
     counters: { milestones: 0, formSubmits: 0 },
     firstInteractionAt,
     lastInteractionAt,
@@ -94,15 +93,15 @@ function buildNewCustomer(customerId: string, input: ResolveCustomerInput): Cust
 }
 
 async function findByHints(customers: Collection<CustomerDoc>, hints?: ResolveHints): Promise<string | null> {
-  const phoneHash = hints?.phoneHash ?? null;
-  if (phoneHash) {
-    const byPhone = await customers.findOne({ phoneHash, status: "active" }, { projection: { _id: 1 } });
+  const phone = hints?.phone ?? null;
+  if (phone) {
+    const byPhone = await customers.findOne({ phone, status: "active" }, { projection: { _id: 1 } });
     if (byPhone) return byPhone._id;
   }
 
-  const emailHash = hints?.emailHash ?? null;
-  if (emailHash) {
-    const byEmail = await customers.findOne({ emailHash, status: "active" }, { projection: { _id: 1 } });
+  const email = hints?.email ?? null;
+  if (email) {
+    const byEmail = await customers.findOne({ email, status: "active" }, { projection: { _id: 1 } });
     if (byEmail) return byEmail._id;
   }
 

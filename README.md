@@ -4,11 +4,12 @@
 ออกแบบให้ขยายไป Meta / Facebook API และ AI Pipeline ได้โดยไม่ต้องรื้อระบบ
 
 ```
-LINE OA ──webhook──> Vercel ──> MongoDB (Source of Truth)
+LINE OA ──webhook──> Vercel ──> MongoDB line_crm_dev (Source of Truth)
                         │            ↑
 LINE User ──> LIFF ──> Vercel ───────┘
                         │
                         └──> n8n ──> Google Sheets (Operational View)
+                        └──> n8n WF-D ──> MongoDB line_crm_ai (AI-safe Mirror)
 ```
 
 ## เอกสาร
@@ -17,14 +18,14 @@ LINE User ──> LIFF ──> Vercel ───────┘
 |---|---|---|
 | 00 | [Requirements & Risks](docs/00-requirements-risks.md) | สรุป requirement, ข้อที่ยังไม่ชัด, assumption, technical risk 8 ข้อ |
 | 01 | [Architecture](docs/01-architecture.md) | component diagram, data flow A–D, responsibility matrix, API boundary |
-| 02 | [Database Design](docs/02-database.md) | 8 collections, index, identity strategy, merge algorithm, PII pattern |
+| 02 | [Database Design](docs/02-database.md) | collections, index, identity strategy, merge algorithm, plaintext + AI mirror |
 | 03 | [API Design](docs/03-api.md) | endpoint map, request/response schema, env vars, rate limit |
 | 04 | [n8n Workflows](docs/04-n8n-workflows.md) | WF-A ถึง WF-F แบบ node-by-node, idempotency matrix |
 | 05 | [Project Structure](docs/05-project-structure.md) | โครง monorepo + ลำดับ implement S1–S11 |
 | 06 | [Testing Checklist](docs/06-testing.md) | 90+ เคส ครอบคลุม security, duplicate, merge, recovery |
 | 07 | [Local Dev Setup](docs/07-local-dev.md) | n8n บน Docker → pull mode, docker-compose, checklist ขึ้น prod |
 | 08 | [LIFF Fields & Sheets](docs/08-liff-fields-and-sheets.md) | โครงสร้าง field ลูกค้า, ร่างฟอร์ม LIFF, layout Google Sheets |
-| 09 | [PII Service](docs/09-pii-service.md) | แกะ scrubber/restore เดิม (Presidio) เป็น service — **อยู่ใน critical path ของ WF-C** |
+| 09 | [PII Service](docs/09-pii-service.md) | แนวทาง Presidio สำหรับอนาคตเมื่อ mirror คำตอบปลายเปิด / free text |
 | 10 | [MongoDB Compression](docs/10-mongodb-compression.md) | network + storage compression, ตัวเลขวัดจริง |
 | 11 | [S2 — LINE Webhook](docs/11-s2-webhook.md) | inbound outbox, idempotency, ผลทดสอบ end-to-end |
 | 12 | [S3 — Customer Identity (รีวิว)](docs/12-s3-review.md) | resolve/merge/upsert + บั๊ก 4 จุดที่แก้ |
@@ -34,6 +35,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 17 | [S6+S7 — หน้า LIFF + รับข้อมูล](docs/17-s6-s7-liff-form.md) | UI, merge, idempotency, ผลทดสอบจริง |
 | 18 | [S7 — ตรวจความปลอดภัย](docs/18-s7-security-review.md) | injection, ช่องโหว่ดูดข้อมูลด้วยเบอร์, rate limit, logging |
 | 19 | [S8 — Google Sheets Sync](docs/19-s8-sheets-sync.md) | นิยามคอลัมน์, คิวซิงก์, WF-C, ผลทดสอบจริง |
+| 20 | [S9 — Plaintext DB + AI Mirror](docs/20-s9-plaintext-ai-mirror.md) | plaintext phone/email, scrubbed AI DB, WF-D, ผลทดสอบจริง |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
 ## Design Decisions (ยืนยันแล้ว)
@@ -48,13 +50,13 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | D6 | ลำดับ implement | S1 → S11 ตาม docs/05 |
 | D7 | n8n dev | Docker บนเครื่อง + **pull mode** (ไม่ต้อง host, ไม่ต้อง tunnel) |
 | D8 | n8n prod | Cloud-hosted — เปลี่ยนแค่ `N8N_PUSH_ENABLED=true` |
-| D9 | Privacy layer | `Mongo → scrub → AI → restore → Sheets` — `services/pii` อยู่ใน critical path |
+| D9 | Privacy layer | S9: DB หลักเป็น plaintext, AI เห็นเฉพาะ `line_crm_ai` ที่ scrub/mask/hash แล้ว |
 | D10 | หน้าที่ AI | ~~AI match Column ID~~ → **ไม่ใช้ AI** map ตรงจาก `SHEET_COLUMNS` (docs/19) |
 | D11 | AI model | ~~OpenAI~~ → **ไม่ใช้** — ไม่มี AI จึงไม่ต้อง scrub/restore ในเส้นทางนี้ |
-| D12 | restore ก่อนเขียนชีต | ✅ ต้อง restore — พนักงานเห็นข้อมูลจริง |
+| D12 | restore ก่อนเขียนชีต | ไม่ใช้แล้วใน WF-C — Sheets อ่านจาก Mongo ตรงและเห็นข้อมูลเต็ม |
 | D13 | flow LINE ผ่าน AI ไหม | ❌ ไม่ผ่าน — follow/first_message ไม่มี free text |
-| D14 | deploy `services/pii` | **container แยก** จำลองให้เหมือน production |
-| D15 | เบอร์/อีเมล ในชีต | **แสดงเต็ม ไม่ mask** (`SHEETS_PII_MODE=full`) |
+| D14 | deploy `services/pii` | พักไว้จนเริ่ม mirror `customer_profiles` หรือ free text ที่ต้องใช้ Presidio |
+| D15 | เบอร์/อีเมล ในชีต | **แสดงเต็ม ไม่ mask** จาก plaintext ใน DB หลัก |
 | D16 | อายุ | เก็บ **`birthYear` เป็น พ.ศ.** ลูกค้ากรอกเอง (LINE ไม่มี API วันเกิด) |
 | D17 | FB / IG | แยก 3 ช่องจาก LINE — ไม่บังคับกรอก |
 | D18 | Email จาก LINE | **ยื่นขอ Email permission** — ได้แล้ว prefill ให้, ไม่ได้ก็ให้กรอกเอง |
@@ -77,7 +79,8 @@ LINE User ──> LIFF ──> Vercel ───────┘
 - [x] **S5 — LIFF session + bootstrap + form_schemas** ✅ 145 tests ผ่าน
 - [x] **S6+S7 — หน้า LIFF + รับข้อมูลเข้าระบบ + merge** ✅ 159 tests ผ่าน
 - [x] **S8 — Google Sheets sync + WF-C** ✅ 175 tests ผ่าน
-- [ ] Phase 5 — Implementation (S9 → S11)
+- [x] **S9 — Plaintext DB + AI Mirror + WF-D** ✅ 178 integration tests ผ่านบน Atlas dev
+- [ ] Phase 5 — Implementation (S10 → S11)
 - [ ] Phase 6 — Testing
 
 ## ขอบเขตงานนี้

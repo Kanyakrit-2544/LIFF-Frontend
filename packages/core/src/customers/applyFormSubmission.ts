@@ -3,7 +3,6 @@ import { getDb } from "../db/client";
 import { COLLECTIONS, type AuditLogDoc, type CustomerDoc, type CustomerProfileDoc, type InteractionDoc } from "../db/models";
 import { buildZodFromSchema, normalizeAnswers } from "../forms/buildZod";
 import type { FormSchemaDoc } from "../forms/types";
-import { packEmail, packPhone } from "../security/pii";
 
 import { newProfileId } from "../ids";
 import { log } from "../logger";
@@ -69,8 +68,8 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
   const customers = db.collection<CustomerDoc>(COLLECTIONS.customers);
   const profiles = db.collection<CustomerProfileDoc>(COLLECTIONS.customerProfiles);
 
-  const phone = typeof answers.phone === "string" && answers.phone.startsWith("+") ? packPhone(answers.phone) : null;
-  const email = typeof answers.email === "string" && answers.email.includes("@") ? packEmail(answers.email) : null;
+  const phone = typeof answers.phone === "string" && answers.phone.startsWith("+") ? answers.phone : null;
+  const email = typeof answers.email === "string" && answers.email.includes("@") ? answers.email : null;
 
   const customerId = input.customerId;
   const merged = false;
@@ -86,7 +85,7 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
   // การรวมลูกค้ายังทำได้ แต่ต้องผ่านคนหรือผ่านการยืนยันเบอร์ (OTP) เท่านั้น
   if (phone) {
     const other = await customers.findOne(
-      { phoneHash: phone.hash, status: "active", _id: { $ne: customerId } },
+      { phone, status: "active", _id: { $ne: customerId } },
       { projection: { _id: 1 } }
     );
     if (other) {
@@ -130,6 +129,7 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
   const set: Record<string, unknown> = {
     updatedAt: now,
     "sheetSync.dirty": true,
+    "aiSync.dirty": true,
     profileRef: { revision, formId: schema.formId, formVersion: schema.version, updatedAt: now },
   };
 
@@ -140,8 +140,8 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
   if (typeof answers.birthYear === "number") set.birthYear = answers.birthYear;
   if (typeof answers.facebook === "string") set.facebook = answers.facebook;
   if (typeof answers.instagram === "string") set.instagram = answers.instagram;
-  if (phone) { set.phone = phone; set.phoneHash = phone.hash; }
-  if (email) { set.email = email; set.emailHash = email.hash; }
+  if (phone) set.phone = phone;
+  if (email) set.email = email;
 
   if (pendingMergeWith) {
     set.pendingMerge = { candidateId: pendingMergeWith, reason: "phone_match", at: now };

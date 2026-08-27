@@ -39,7 +39,7 @@ export async function pickWinner(a: CustomerDoc, b: CustomerDoc): Promise<{ winn
 
 const FILL_FORWARD: (keyof CustomerDoc)[] = [
   "displayName", "nickname", "fullNameEn", "birthYear", "lineDisplayName",
-  "pictureUrl", "facebook", "instagram", "phone", "email", "phoneHash", "emailHash", "consent",
+  "pictureUrl", "facebook", "instagram", "phone", "email", "consent",
 ];
 
 export async function mergeCustomers(winnerId: string, loserId: string, reason: string, actor = "system"): Promise<MergeResult> {
@@ -75,7 +75,7 @@ export async function mergeCustomers(winnerId: string, loserId: string, reason: 
       await customers.updateOne(
         { _id: winnerId },
         {
-          $set: { ...fill, "sheetSync.dirty": true, updatedAt: new Date() },
+          $set: { ...fill, "sheetSync.dirty": true, "aiSync.dirty": true, updatedAt: new Date() },
           ...(loser.firstInteractionAt ? { $min: { firstInteractionAt: loser.firstInteractionAt } } : {}),
           ...(loser.lastInteractionAt ? { $max: { lastInteractionAt: loser.lastInteractionAt } } : {}),
           $addToSet: { sources: { $each: loser.sources ?? [] }, tags: { $each: loser.tags ?? [] } },
@@ -86,7 +86,7 @@ export async function mergeCustomers(winnerId: string, loserId: string, reason: 
 
       await customers.updateOne(
         { _id: loserId },
-        { $set: { status: "merged", mergedInto: winnerId, "sheetSync.dirty": true, updatedAt: new Date() } },
+        { $set: { status: "merged", mergedInto: winnerId, "sheetSync.dirty": true, "aiSync.dirty": true, updatedAt: new Date() } },
         { session }
       );
 

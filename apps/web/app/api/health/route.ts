@@ -1,4 +1,4 @@
-import { pingDb, queueStats, sheetSyncStats, env, log } from "@line-crm/core";
+import { aiMirrorStats, pingDb, queueStats, sheetSyncStats, env, log } from "@line-crm/core";
 import { newRequestId } from "@/lib/http";
 import { NextResponse } from "next/server";
 
@@ -15,10 +15,12 @@ export async function GET() {
 
   let queue: Record<string, number> | null = null;
   let sheets: Record<string, number> | null = null;
+  let aiMirror: Record<string, number> | null = null;
   if (db.ok) {
     try {
       queue = await queueStats();
       sheets = await sheetSyncStats();
+      aiMirror = await aiMirrorStats();
     } catch (e) {
       log.warn("อ่าน stats ไม่ได้", { requestId, error: (e as Error).message });
     }
@@ -30,11 +32,12 @@ export async function GET() {
     at: new Date().toISOString(),
     db: { ok: db.ok, latencyMs: db.latencyMs, ...(db.error ? { error: "เชื่อมต่อฐานข้อมูลไม่ได้" } : {}) },
     ...(queue ? { queue, deadCount: queue.dead ?? 0 } : {}),
+    ...(sheets ? { sheets } : {}),
+    ...(aiMirror ? { aiMirror } : {}),
     config: {
       dbName: safe(() => env("db").MONGODB_DB),
       compressors: safe(() => env("db").MONGODB_COMPRESSORS),
       n8nPush: safe(() => env("n8n").N8N_PUSH_ENABLED),
-      sheetsPiiMode: safe(() => env("sheets").SHEETS_PII_MODE),
     },
   };
 

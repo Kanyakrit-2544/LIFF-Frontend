@@ -37,7 +37,7 @@ cd "/Users/kanyakritbowornsuwan/Desktop/Claude Code/line-crm" && open -e apps/we
 | `NEXT_PUBLIC_LIFF_ID` | `2011263761-R1cpqPt3` |
 | `LINE_LOGIN_SCOPES` | `openid profile email` — ตัด `email` ออกถ้า permission ยังไม่อนุมัติ |
 | `N8N_PUSH_ENABLED` | `false` (n8n ยังอยู่บนเครื่อง) |
-| `SHEETS_PII_MODE` | `full` |
+| `AI_HASH_PEPPER` | ค่าเดิมหรือค่าสุ่มใหม่จาก `npm run env:vercel` |
 
 **ถ้าค่า LINE หายหรืออยากออกใหม่** — [LINE Developers Console](https://developers.line.biz/console/)
 
@@ -60,16 +60,14 @@ cd "/Users/kanyakritbowornsuwan/Desktop/Claude Code/line-crm" && open -e apps/we
 ค่าที่ใช้อยู่เป็นค่า dev ที่ผมสร้างให้ ควรใช้คนละชุดกับ production
 
 ```bash
-openssl rand -base64 32   # PII_KEY  (ต้อง 32 ไบต์พอดี)
-openssl rand -base64 48   # PII_PEPPER
+openssl rand -base64 48   # AI_HASH_PEPPER
 openssl rand -base64 48   # SESSION_JWT_SECRET
 openssl rand -base64 48   # INTERNAL_HMAC_SECRET
 ```
 
 | ตัวแปร | ข้อควรระวัง |
 |---|---|
-| `PII_KEY` | เปลี่ยนหลังมีข้อมูลจริง = ถอดรหัสเบอร์/อีเมลเก่าไม่ได้ |
-| `PII_PEPPER` | ⚠️ **ห้ามเปลี่ยนตลอดไป** — hash เดิมทั้งฐานใช้ไม่ได้ทันที **เก็บสำรองไว้ที่ปลอดภัย** |
+| `AI_HASH_PEPPER` | มีผลกับ hash ใน `line_crm_ai` — เปลี่ยนแล้ว hash ชุดเก่าจะเปลี่ยน |
 | `SESSION_JWT_SECRET` | เปลี่ยนได้ ผลคือทุกคนที่เปิด LIFF ค้างอยู่ต้อง login ใหม่ |
 | `INTERNAL_HMAC_SECRET` | ⚠️ ต้องใส่ **ค่าเดียวกัน** ใน `.env` ที่รากโปรเจกต์ (n8n อ่านไปใช้) ไม่งั้น n8n โดน 401 |
 

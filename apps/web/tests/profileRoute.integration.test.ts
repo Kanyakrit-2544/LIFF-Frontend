@@ -10,7 +10,7 @@ vi.mock("next/headers", () => ({
 }));
 
 const core = await import("@line-crm/core");
-const { closeClient, COLLECTIONS, ensureIndexes, getDb, upsertSchema, createSession, SESSION_COOKIE, packPhone, normalizePhone, newCustomerId } = core;
+const { closeClient, COLLECTIONS, ensureIndexes, getDb, upsertSchema, createSession, SESSION_COOKIE, newCustomerId } = core;
 const { POST: submit } = await import("../app/api/liff/customer/profile/route");
 
 const runIntegration = process.env.RUN_MONGO_INTEGRATION === "true";
@@ -36,9 +36,10 @@ async function makeCustomer(): Promise<string> {
   await (await getDb()).collection(COLLECTIONS.customers).insertOne({
     _id: id, status: "active", mergedInto: null, displayName: null, nickname: null, fullNameEn: null,
     birthYear: null, lineDisplayName: `LINE ${runId}`, pictureUrl: null, facebook: null, instagram: null,
-    phone: null, email: null, phoneHash: null, emailHash: null, customerStatus: "lead", tags: [],
+    phone: null, email: null, customerStatus: "lead", tags: [],
     source: { channel: "line", campaign: null }, sources: ["line"], consent: null, profileRef: null,
     sheetSync: { dirty: false, rowKey: id, syncedAt: null, lockedAt: null, attempts: 0 },
+    aiSync: { dirty: false, syncedAt: null, lockedAt: null, attempts: 0 },
     counters: { milestones: 0, formSubmits: 0 }, firstInteractionAt: new Date(), firstMessageAt: null,
     lastInteractionAt: new Date(), createdAt: new Date(), updatedAt: new Date(), schemaVersion: 1,
   } as never);
@@ -94,7 +95,7 @@ async function cleanup() {
   ]);
 }
 
-describe.runIf(() => available)("POST /api/liff/customer/profile", () => {
+describe.runIf(runIntegration)("POST /api/liff/customer/profile", () => {
   it("ไม่มี session → 401", async () => {
     jar.clear();
     expect((await submit(req(answers()))).status).toBe(401);
@@ -108,18 +109,20 @@ describe.runIf(() => available)("POST /api/liff/customer/profile", () => {
 
     const c = await (await getDb()).collection(COLLECTIONS.customers).findOne({ _id: customerId } as never);
     expect(c?.displayName).toBe("สมชาย ใจดี");
-    expect(c?.phoneHash).toBeTruthy();
+    expect(c?.phone).toBe("+66812345678");
     expect(c?.sheetSync.dirty).toBe(true);
+    expect(c?.aiSync.dirty).toBe(true);
     expect(c?.consent?.dataProcessing).toBe(true);
     expect(c?.counters.formSubmits).toBe(1);
   });
 
-  it("⭐ เก็บเบอร์เป็น hash + enc ไม่มี plaintext ใน field ที่ index", async () => {
+  it("⭐ S9 เก็บเบอร์เป็น plaintext normalized ใน DB หลัก และไม่มี field encrypt/hash เก่า", async () => {
     await submit(req(answers()));
     const c = await (await getDb()).collection(COLLECTIONS.customers).findOne({ _id: customerId } as never);
-    expect(JSON.stringify(c?.phoneHash)).not.toContain("0812345678");
-    expect(c?.phone?.enc).toMatch(/^v1:/);
-    expect(c?.phone?.masked).toBe("08x-xxx-5678");
+    expect(c?.phone).toBe("+66812345678");
+    expect(c).not.toHaveProperty("phoneHash");
+    expect(c).not.toHaveProperty("emailHash");
+    expect(JSON.stringify(c)).not.toContain('"enc"');
   });
 
   it("ขาด required → 400 พร้อมชื่อ field", async () => {
@@ -180,9 +183,8 @@ describe.runIf(() => available)("POST /api/liff/customer/profile", () => {
     // ถ้า merge เลย = ใครพิมพ์เบอร์คนอื่นก็ยึดข้อมูลเขาได้
     const db = await getDb();
     const other = await makeCustomer();
-    const p = packPhone(normalizePhone("0812345678")!);
     await db.collection(COLLECTIONS.customers).updateOne({ _id: other } as never, {
-      $set: { phoneHash: p.hash, phone: p, displayName: "ลูกค้าเก่า", nickname: "เก่า",
+      $set: { phone: "+66812345678", displayName: "ลูกค้าเก่า", nickname: "เก่า",
               createdAt: new Date(Date.now() - 86400000) },
     });
 

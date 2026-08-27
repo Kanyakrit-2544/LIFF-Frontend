@@ -73,7 +73,7 @@
 
 ## 8.4 Google Sheets Layout
 
-แท็บ `Customers` — 1 แถว = 1 คน · **แสดงเต็มไม่ mask** (`SHEETS_PII_MODE=full` ✔ ยืนยัน)
+แท็บ `Customers` — 1 แถว = 1 คน · **แสดงเต็มไม่ mask** จาก plaintext ใน DB หลัก
 
 | Col | Column ID | Header | ที่มา |
 |---|---|---|---|

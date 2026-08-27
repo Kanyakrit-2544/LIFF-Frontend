@@ -11,12 +11,13 @@ describe("env", () => {
     expect(e.MONGODB_BLOCK_COMPRESSOR).toBe("zstd");
   });
 
-  it("PII_KEY ที่ไม่ใช่ base64 32 ไบต์ ต้อง throw พร้อมบอกวิธีแก้", () => {
-    const saved = process.env.PII_KEY;
-    process.env.PII_KEY = "too-short";
+  it("AI_HASH_PEPPER สั้นเกินไปต้อง throw", () => {
+    const saved = process.env.AI_HASH_PEPPER;
+    process.env.AI_HASH_PEPPER = "too-short";
     __resetEnvCache();
-    expect(() => env("pii")).toThrow(/PII_KEY/);
-    process.env.PII_KEY = saved;
+    expect(() => env("ai")).toThrow(/AI_HASH_PEPPER/);
+    if (saved === undefined) delete process.env.AI_HASH_PEPPER;
+    else process.env.AI_HASH_PEPPER = saved;
   });
 
   it("ขาดค่าที่จำเป็นต้อง throw ทันที ไม่ปล่อยผ่าน", () => {

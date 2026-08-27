@@ -80,7 +80,7 @@ async function setFirstInteractionAt(customerId: string, occurredAt: Date, now: 
         { firstInteractionAt: { $gt: occurredAt } },
       ],
     },
-    { $set: { firstInteractionAt: occurredAt, "sheetSync.dirty": true, updatedAt: now } }
+    { $set: { firstInteractionAt: occurredAt, "sheetSync.dirty": true, "aiSync.dirty": true, updatedAt: now } }
   );
   return r.modifiedCount === 1;
 }
@@ -103,7 +103,10 @@ async function updateLineCustomer(input: {
   //                    → ห้ามทับ ไม่งั้นข้อความที่ลูกค้าส่งมาทีหลังจะลบชื่อจริงทิ้ง
   if (input.profile.displayName) set.lineDisplayName = input.profile.displayName;
   if (input.profile.pictureUrl) set.pictureUrl = input.profile.pictureUrl;
-  if (input.setDirty) set["sheetSync.dirty"] = true;
+  if (input.setDirty) {
+    set["sheetSync.dirty"] = true;
+    set["aiSync.dirty"] = true;
+  }
 
   await (await getDb()).collection<CustomerDoc>(COLLECTIONS.customers).updateOne(
     { _id: input.customerId },
@@ -121,14 +124,14 @@ async function updateLineCustomer(input: {
   if (input.profile.displayName) {
     await (await getDb()).collection<CustomerDoc>(COLLECTIONS.customers).updateOne(
       { _id: input.customerId, $or: [{ displayName: { $exists: false } }, { displayName: null }, { displayName: "" }] },
-      { $set: { displayName: input.profile.displayName, updatedAt: input.now, "sheetSync.dirty": true } }
+      { $set: { displayName: input.profile.displayName, updatedAt: input.now, "sheetSync.dirty": true, "aiSync.dirty": true } }
     );
   }
 
   if (input.eventType === "follow") {
     await (await getDb()).collection<CustomerDoc>(COLLECTIONS.customers).updateOne(
       { _id: input.customerId, customerStatus: "inactive" },
-      { $set: { customerStatus: "lead", updatedAt: input.now, "sheetSync.dirty": true } }
+      { $set: { customerStatus: "lead", updatedAt: input.now, "sheetSync.dirty": true, "aiSync.dirty": true } }
     );
   }
 }
@@ -194,7 +197,7 @@ export async function upsertFromLine(input: UpsertFromLineInput): Promise<Upsert
     const first = await (await getDb()).collection<CustomerDoc>(COLLECTIONS.customers).updateOne(
       { _id: resolved.customerId, $or: [{ firstMessageAt: { $exists: false } }, { firstMessageAt: null }] },
       {
-        $set: { firstMessageAt: occurredAt, "sheetSync.dirty": true, updatedAt: now },
+        $set: { firstMessageAt: occurredAt, "sheetSync.dirty": true, "aiSync.dirty": true, updatedAt: now },
         $addToSet: { tags: "engaged" },
         $max: { lastInteractionAt: occurredAt },
       }

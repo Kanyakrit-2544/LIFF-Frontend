@@ -17,9 +17,10 @@ export const INDEX_SPECS: Spec[] = [
   {
     collection: COLLECTIONS.customers,
     indexes: [
-      { key: { phoneHash: 1 }, name: "ix_phoneHash", sparse: true },
-      { key: { emailHash: 1 }, name: "ix_emailHash", sparse: true },
+      { key: { phone: 1 }, name: "ix_phone", sparse: true },
+      { key: { email: 1 }, name: "ix_email", sparse: true },
       { key: { "sheetSync.dirty": 1, "sheetSync.lockedAt": 1 }, name: "ix_sheetSyncQueue" },
+      { key: { "aiSync.dirty": 1, "aiSync.lockedAt": 1 }, name: "ix_aiSyncQueue" },
       { key: { customerStatus: 1, createdAt: -1 }, name: "ix_statusCreated" },
       { key: { mergedInto: 1 }, name: "ix_mergedInto", sparse: true },
       { key: { updatedAt: -1 }, name: "ix_updatedAt" },

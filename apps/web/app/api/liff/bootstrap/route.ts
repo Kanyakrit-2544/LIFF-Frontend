@@ -1,7 +1,6 @@
 import {
   COLLECTIONS,
   DEFAULT_FORM_ID,
-  decrypt,
   getDb,
   getPublishedSchema,
   log,
@@ -47,14 +46,14 @@ export async function GET() {
     }
 
     // ค่าที่ระบบมีอยู่แล้ว ใช้เติมลงฟอร์มให้ลูกค้าไม่ต้องพิมพ์ซ้ำ
-    // PII ถอดรหัสตรงนี้เพราะเป็นข้อมูลของเจ้าตัวเอง (session ยืนยันแล้ว) ไม่ใช่ของคนอื่น
+    // S9: DB หลักเก็บ phone/email เป็น plaintext normalized แล้ว
     const prefill: Record<string, unknown> = {
       fullNameTh: customer.displayName ?? "",
       nickname: customer.nickname ?? "",
       fullNameEn: customer.fullNameEn ?? "",
       birthYear: customer.birthYear ? String(customer.birthYear) : "",
-      phone: safeDecrypt(customer.phone?.enc, requestId),
-      email: safeDecrypt(customer.email?.enc, requestId),
+      phone: customer.phone ?? "",
+      email: customer.email ?? "",
       facebook: customer.facebook ?? "",
       instagram: customer.instagram ?? "",
       consentDataProcessing: customer.consent?.dataProcessing ?? false,
@@ -85,7 +84,6 @@ export async function GET() {
   }
 }
 
-/** ถอดรหัสไม่ได้ (เช่นหมุน key แล้วข้อมูลเก่าอ่านไม่ออก) ต้องไม่ทำให้ทั้งหน้าเปิดไม่ขึ้น */
 /** ตามสาย mergedInto ไปหาลูกค้าตัวจริง (สูงสุด 5 ชั้น กัน loop) */
 async function followMerge(db: Awaited<ReturnType<typeof getDb>>, id: string): Promise<string> {
   let cur = id;
@@ -97,14 +95,4 @@ async function followMerge(db: Awaited<ReturnType<typeof getDb>>, id: string): P
     cur = doc.mergedInto;
   }
   return cur;
-}
-
-function safeDecrypt(enc: string | undefined | null, requestId: string): string {
-  if (!enc) return "";
-  try {
-    return decrypt(enc);
-  } catch (e) {
-    log.warn("ถอดรหัส PII ไม่สำเร็จ", { requestId, error: (e as Error).message });
-    return "";
-  }
 }

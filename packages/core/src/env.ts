@@ -6,18 +6,6 @@ import { z } from "zod";
  * แต่ละกลุ่ม validate ครั้งแรกที่เรียกแล้ว cache ไว้ — ขาดค่าไหน = throw ทันที ไม่ปล่อยให้ไปพังตอนมีผู้ใช้จริง
  */
 
-const b64 = (bytes: number, label: string) =>
-  z.string().refine(
-    (v) => {
-      try {
-        return Buffer.from(v, "base64").length === bytes;
-      } catch {
-        return false;
-      }
-    },
-    { message: `${label} ต้องเป็น base64 ขนาด ${bytes} ไบต์ (สร้างด้วย: openssl rand -base64 ${bytes})` }
-  );
-
 const dbSchema = z.object({
   MONGODB_URI: z.string().min(1).startsWith("mongodb"),
   MONGODB_DB: z.string().min(1).default("line_crm"),
@@ -27,10 +15,12 @@ const dbSchema = z.object({
   MONGODB_BLOCK_COMPRESSOR: z.enum(["zstd", "snappy", "zlib", "none"]).default("zstd"),
 });
 
-const piiSchema = z.object({
-  PII_KEY: b64(32, "PII_KEY"),
-  /** ⚠️ ห้ามเปลี่ยนหลัง production — hash เดิมทั้งฐานจะใช้ไม่ได้ */
-  PII_PEPPER: z.string().min(32, "PII_PEPPER ต้องยาวอย่างน้อย 32 ตัวอักษร"),
+const aiSchema = z.object({
+  /**
+   * ใช้ hash เฉพาะใน line_crm_ai เท่านั้น
+   * ต้องแยกจาก pepper เก่าของ DB หลัก เพื่อไม่ให้ join ข้ามฐานได้ง่าย
+   */
+  AI_HASH_PEPPER: z.string().min(32, "AI_HASH_PEPPER ต้องยาวอย่างน้อย 32 ตัวอักษร"),
 });
 
 const lineSchema = z.object({
@@ -59,18 +49,12 @@ const n8nSchema = z.object({
   N8N_WEBHOOK_FORM: z.string().url().optional(),
 });
 
-const sheetsSchema = z.object({
-  /** D15: full — ทีมขายต้องใช้เบอร์จริง */
-  SHEETS_PII_MODE: z.enum(["full", "masked"]).default("full"),
-});
-
 const groups = {
   db: dbSchema,
-  pii: piiSchema,
+  ai: aiSchema,
   line: lineSchema,
   security: securitySchema,
   n8n: n8nSchema,
-  sheets: sheetsSchema,
 } as const;
 
 type Groups = typeof groups;

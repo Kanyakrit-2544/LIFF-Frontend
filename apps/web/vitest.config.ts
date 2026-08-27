@@ -6,6 +6,7 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./tests/setup.ts"],
     testTimeout: 10_000,
+    fileParallelism: process.env.RUN_MONGO_INTEGRATION !== "true",
   },
   resolve: {
     alias: {

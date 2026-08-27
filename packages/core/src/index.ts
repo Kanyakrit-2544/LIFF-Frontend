@@ -12,15 +12,9 @@ export {
 } from "./identity/normalize";
 
 export {
-  encrypt,
-  decrypt,
   hashValue,
   maskPhone,
   maskEmail,
-  packPhone,
-  packEmail,
-  forSheet,
-  type PiiTriple,
 } from "./security/pii";
 
 export { getClient, getDb, closeClient, pingDb } from "./db/client";
@@ -62,4 +56,6 @@ export { applyFormSubmission, type ApplyFormInput, type ApplyFormResult } from "
 export { toSheetRow, SHEET_COLUMNS, SYSTEM_COLUMNS, HEADERS, COLUMN_IDS, columnLetter, systemRange, type SheetColumn } from "./customers/toSheetRow";
 export { claimDirtyCustomers, ackSheetSync, sheetSyncStats, type SheetPendingRow, type SheetAckItem } from "./customers/sheetQueue";
 export { upsertFromLine, type UpsertFromLineInput, type UpsertFromLineResult } from "./customers/upsertFromLine";
+export { scrubCustomer, type ScrubbedCustomer } from "./ai/scrubCustomer";
+export { claimAiMirrorCustomers, ackAiMirror, aiMirrorStats, type AiMirrorPendingRow, type AiMirrorAckItem } from "./ai/aiMirror";
 export * from "./db/models";

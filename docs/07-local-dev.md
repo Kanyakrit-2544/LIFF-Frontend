@@ -50,7 +50,8 @@ export async function publish(topic, payload) {
 }
 ```
 
-**S4 actual:** ใช้ WF-A Schedule Trigger ทุก 15 วินาทีเป็น pull loop และ reconciler ในตัว ไม่ต้องมี WF-D แยก
+**S4 actual:** ใช้ WF-A Schedule Trigger ทุก 15 วินาทีเป็น pull loop และ reconciler ในตัว ไม่ต้องมี WF-D event reconciler แยก
+**S9 actual:** มี WF-D ใหม่สำหรับ AI mirror เท่านั้น (`workflows/WF-D-ai-mirror.json`)
 **ตอนขึ้น prod:** เปลี่ยน env เป็น `true` ได้เพื่อให้ Vercel push มาเร่ง latency แต่ WF-A ยังล้างคิวทั้งหมดเหมือนเดิม — **ไม่ต้องแก้โค้ด**
 
 > นี่คือผลพลอยได้ของ inbound outbox pattern: push เป็นแค่ **การเร่งความเร็ว** ไม่ใช่เส้นทางเดียวที่ข้อมูลไหลได้ ปิดไปก็ยังทำงานถูก

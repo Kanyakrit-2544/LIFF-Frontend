@@ -5,15 +5,15 @@
 - [ ] `normalize.phone` — `0812345678`, `+66812345678`, `081-234-5678`, `66812345678` → `+66812345678` เหมือนกันหมด
 - [ ] `normalize.phone` — input ขยะ (`abc`, `123`, ว่าง) → throw / null ไม่ใช่ hash มั่ว
 - [ ] `normalize.email` — ` Somchai@GMAIL.com ` → `somchai@gmail.com`
-- [ ] `pii.encrypt/decrypt` — round-trip ได้ค่าเดิม, ciphertext ต่างกันทุกครั้ง (IV สุ่ม)
-- [ ] `pii.hash` — deterministic, pepper เปลี่ยน → hash เปลี่ยน
+- [ ] `pii.hash` — deterministic, `AI_HASH_PEPPER` เปลี่ยน → hash เปลี่ยน
 - [ ] `pii.mask` — `0812345678` → `08x-xxx-5678`, email → `so***@gmail.com`
+- [ ] `scrubCustomer` — ชื่อเป็น `<PERSON_x>`, เบอร์/อีเมลเป็น mask+hash, ไม่มี PII ดิบ
 - [ ] `lineSignature.verify` — signature ถูก = true, ผิด 1 byte = false, ความยาวต่างกัน = false ไม่ throw
 - [ ] `internalHmac` — timestamp เก่ากว่า 300s = ปฏิเสธ (replay)
 - [ ] `buildZod` — required / pattern / minItems / maxLength / visibleIf ทำงานตาม schema
 - [ ] `buildZod` — field ที่ไม่อยู่ใน schema ถูกตัดทิ้ง (`.strict()`) ← mass assignment
 - [ ] `merge` — winner ได้ `firstInteractionAt` ที่เก่ากว่า, `sources` รวมกัน, loser เป็น tombstone
-- [ ] `toSheetRow` — คอลัมน์ตรงลำดับ, PII เป็น masked เสมอ, ไม่มี field ใหม่หลุดเข้ามา
+- [ ] `toSheetRow` — คอลัมน์ตรงลำดับ, phone/email เป็น plaintext เต็ม, ไม่มี field ใหม่หลุดเข้ามา
 
 ## 6.2 LINE Follow
 
@@ -21,14 +21,15 @@
 - [ ] `firstInteractionAt` == `createdAt` และ **ไม่เปลี่ยน**เมื่อมี event ถัดไป
 - [ ] `source.channel == "line"`, `sources == ["line"]`
 - [ ] `sheetSync.dirty == true`
+- [ ] `aiSync.dirty == true`
 - [ ] ได้ welcome message พร้อมปุ่มเปิด LIFF
 - [ ] user ที่เคย follow → unfollow → follow ใหม่ → **ไม่เกิด customer ใหม่**, `customerStatus` กลับเป็น active
 
 ## 6.2b First Message (เก็บเฉพาะการทักครั้งแรก)
 
 - [ ] user follow แล้วยังไม่ทัก → `firstMessageAt` ไม่มี, ไม่มี interaction `first_message`
-- [ ] ทักครั้งแรก → `interactions{type:"first_message"}` 1 record + `firstMessageAt` ถูกตั้ง + `sheetSync.dirty = true`
-- [ ] ทักครั้งที่ 2, 3, 4 → **ไม่มี interaction เพิ่ม**, `firstMessageAt` ไม่เปลี่ยน, `sheetSync.dirty` ไม่ถูกตั้ง ⭐
+- [ ] ทักครั้งแรก → `interactions{type:"first_message"}` 1 record + `firstMessageAt` ถูกตั้ง + `sheetSync.dirty = true` + `aiSync.dirty = true`
+- [ ] ทักครั้งที่ 2, 3, 4 → **ไม่มี interaction เพิ่ม**, `firstMessageAt` ไม่เปลี่ยน, `sheetSync.dirty` / `aiSync.dirty` ไม่ถูกตั้งใหม่ ⭐
 - [ ] ทักครั้งที่ 2 → `lastInteractionAt` อัปเดต (แต่ไม่ trigger Sheets sync)
 - [ ] **ส่ง 5 ข้อความรัวพร้อมกัน (concurrent)** → `first_message` มี **1 record เท่านั้น** ⭐
 - [ ] user ที่ทักก่อน follow (เจอได้จริง) → มีทั้ง `follow` และ `first_message`, `firstInteractionAt` = ตัวที่เกิดก่อน
@@ -66,7 +67,7 @@
 ## 6.6 Existing Customer / New Customer
 
 - [ ] ลูกค้าเก่า (import มาแล้ว มีเบอร์ แต่ไม่มี lineUserId) → เปิด LIFF ครั้งแรก → เห็น "ลูกค้าใหม่" (ยังไม่ match)
-- [ ] กรอกเบอร์ที่ตรงกับลูกค้าเก่า → **merge** → `identities` ของ LINE ย้ายไปอยู่กับ customer เดิม
+- [ ] กรอกเบอร์ที่ตรงกับลูกค้าเก่า → ตั้ง `pendingMerge` ไม่ merge อัตโนมัติ
 - [ ] หลัง merge: `customer_profiles`, `interactions` ทั้งหมดย้ายตาม, ไม่มีของค้างที่ loser
 - [ ] loser มี `status: "merged"`, `mergedInto` ชี้ถูก
 - [ ] เข้า LIFF อีกครั้งหลัง merge → `bootstrap` คืนข้อมูลของ winner
@@ -90,7 +91,7 @@
 - [ ] Update: `$setOnInsert` ไม่ทับ `firstInteractionAt`
 - [ ] transaction ของ merge — จำลอง error กลางคัน → ทุกอย่าง rollback ไม่มีสภาพครึ่ง ๆ
 - [ ] connection reuse บน serverless — ยิง 50 request แล้ว connection count ไม่พุ่งชน limit ⭐
-- [ ] ไม่มี field ที่เก็บ phone/email plaintext (`db.customers.findOne()` ตรวจด้วยตา)
+- [ ] `db.customers.findOne()` เห็น `phone: "+66..."` และ `email` เป็น plaintext normalized ตาม S9
 
 ## 6.9 Google Sheets Sync
 
@@ -102,12 +103,12 @@
 - [ ] ack ไม่ถึง → รอบหน้าเขียนทับค่าเดิม ผลลัพธ์เหมือนเดิม
 - [ ] คอลัมน์ staffNote ที่พนักงานพิมพ์เอง → **ไม่ถูกระบบเขียนทับ** ⭐
 - [ ] ลบแถวใน Sheets แล้ว set dirty ใหม่ → แถวกลับมา (Sheets rebuild ได้จาก Mongo)
-- [ ] เบอร์ใน Sheets เป็น masked ไม่ใช่เบอร์เต็ม
+- [ ] เบอร์ใน Sheets เป็นเบอร์เต็ม ไม่ใช่ `[object Object]` และไม่ใช่ mask
 
 ## 6.10 Failure & Recovery
 
 - [ ] ปิด n8n → follow user ใหม่ → `inbound_events` เป็น `pending`, LINE ยังได้ 200
-- [ ] เปิด n8n กลับมา → WF-D กวาดขึ้นมาทำภายใน 1–2 นาที → customer ถูกสร้าง ⭐
+- [ ] เปิด n8n กลับมา → WF-A schedule กวาด event pending ขึ้นมาทำ → customer ถูกสร้าง ⭐
 - [ ] Mongo ล่ม → `/api/webhook/line` ตอบ `503` → LINE retry เอง
 - [ ] `/api/health` สะท้อนสถานะ Mongo จริง (ไม่ใช่ตอบ 200 ตลอด)
 - [ ] event ที่ fail 5 ครั้ง → `dead` + มี alert เข้ากลุ่ม dev
@@ -118,6 +119,13 @@
 
 - [ ] log ของทั้งระบบ (Vercel + n8n execution) — grep หาเบอร์โทรจริง → **ต้องไม่เจอ** ⭐
 - [ ] error message ที่ส่งกลับ client ไม่มี stack trace / ชื่อ collection / connection string
+- [ ] `/internal/ai-mirror/pending` ไม่มี HMAC → 401
+- [ ] `/internal/ai-mirror/pending` timestamp เก่า → 401
+- [ ] `/internal/ai-mirror/pending` คืนเฉพาะ scrubbed payload ไม่ส่งชื่อ/เบอร์/อีเมลดิบ
+- [ ] `/internal/ai-mirror/ack` ok → เคลียร์ `aiSync.dirty`
+- [ ] merge แล้ว winner/loser ถูกตั้ง `aiSync.dirty` ทั้งคู่ และ loser ส่ง `status:"merged"` ไป AI mirror
+- [ ] ต่อด้วย `ai_user` แล้วอ่าน `line_crm_dev.customers` → ต้องถูกปฏิเสธ
+- [ ] ต่อด้วย `mirror_user` แล้วอ่าน `line_crm_dev.customers` → ต้องถูกปฏิเสธ
 - [ ] `scrub` → ข้อความไม่มี PII เหลือ; `restore` → กลับเป็นเหมือนเดิม 100%
 - [ ] `pii_tokens` มี TTL และหมดอายุจริง
 - [ ] `restore` ด้วย jobId ของคนอื่น → `403`

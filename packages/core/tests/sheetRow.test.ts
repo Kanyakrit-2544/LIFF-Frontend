@@ -1,20 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { SHEET_COLUMNS, SYSTEM_COLUMNS, HEADERS, columnLetter, systemRange, toSheetRow } from "../src/customers/toSheetRow";
-import { packPhone, packEmail } from "../src/security/pii";
-import { normalizePhone } from "../src/identity/normalize";
 import type { CustomerDoc } from "../src/db/models";
 
 const base = (o: Partial<CustomerDoc> = {}): CustomerDoc => ({
   _id: "cus_01TEST", status: "active", mergedInto: null,
   displayName: "สมชาย ใจดี", nickname: "ชาย", fullNameEn: "Somchai Jaidee", birthYear: 2535,
   lineDisplayName: "Somchai", pictureUrl: null, facebook: "fb.somchai", instagram: null,
-  phone: packPhone(normalizePhone("0812345678")!), email: packEmail("somchai@gmail.com"),
-  phoneHash: "h", emailHash: "h", customerStatus: "lead", tags: ["line-follower"],
+  phone: "+66812345678", email: "somchai@gmail.com",
+  customerStatus: "lead", tags: ["line-follower"],
   source: { channel: "line", campaign: null }, sources: ["line"],
   consent: { dataProcessing: true, marketing: false, version: "v1", grantedAt: new Date("2026-08-01"), ip: null, userAgent: null },
   profileRef: { revision: 1, formId: "f", formVersion: "v1", updatedAt: new Date("2026-08-02") },
   pendingMerge: null,
   sheetSync: { dirty: true, rowKey: "cus_01TEST", syncedAt: null, lockedAt: null, attempts: 0 },
+  aiSync: { dirty: true, syncedAt: null, lockedAt: null, attempts: 0 },
   counters: { milestones: 1, formSubmits: 1 },
   firstInteractionAt: new Date("2026-07-01"), firstMessageAt: new Date("2026-07-02"),
   lastInteractionAt: new Date("2026-08-02"), createdAt: new Date("2026-07-01"), updatedAt: new Date("2026-08-03T10:20:00Z"),
@@ -57,15 +56,10 @@ describe("toSheetRow", () => {
     const i = SYSTEM_COLUMNS.findIndex((c) => c.id === "age");
     expect(row[i]).toBe(String(new Date().getFullYear() + 543 - 2535));
   });
-  it("ถอดรหัสเบอร์/อีเมลได้เมื่อโหมด full", () => {
+  it("ชีตได้เบอร์/อีเมล plaintext เต็มจาก DB หลัก", () => {
     const row = toSheetRow(base());
     expect(row[SYSTEM_COLUMNS.findIndex((c) => c.id === "phone")]).toBe("+66812345678");
     expect(row[SYSTEM_COLUMNS.findIndex((c) => c.id === "email")]).toBe("somchai@gmail.com");
-  });
-  it("ถอดรหัสไม่ได้ → ใช้ค่า mask ไม่ทำให้ทั้งรอบล้ม", () => {
-    const c = base({ phone: { hash: "h", enc: "v1:เสีย:เสีย:เสีย", masked: "08x-xxx-5678" } });
-    expect(() => toSheetRow(c)).not.toThrow();
-    expect(toSheetRow(c)[SYSTEM_COLUMNS.findIndex((x) => x.id === "phone")]).toBe("08x-xxx-5678");
   });
   it("ค่าว่างเป็นสตริงว่าง ไม่ใช่ null/undefined", () => {
     const row = toSheetRow(base({ nickname: null, birthYear: null, email: null, firstMessageAt: null }));

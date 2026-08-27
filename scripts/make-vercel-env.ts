@@ -36,8 +36,7 @@ const dev = Object.fromEntries(
 
 /** ค่าที่ควรเป็นคนละชุดกับ dev — dev secret รั่วแล้ว production ต้องไม่พังตาม */
 const FRESH = {
-  PII_KEY: () => crypto.randomBytes(32).toString("base64"),
-  PII_PEPPER: () => crypto.randomBytes(48).toString("base64"),
+  AI_HASH_PEPPER: () => crypto.randomBytes(48).toString("base64"),
   SESSION_JWT_SECRET: () => crypto.randomBytes(48).toString("base64"),
   INTERNAL_HMAC_SECRET: () => crypto.randomBytes(48).toString("base64"),
 } as const;
@@ -50,7 +49,6 @@ const COPY = [
 const DEFAULTS: Record<string, string> = {
   LINE_LOGIN_SCOPES: "openid profile email",
   N8N_PUSH_ENABLED: "false",
-  SHEETS_PII_MODE: "full",
   MONGODB_DB: "line_crm",
   MONGODB_COMPRESSORS: "zstd,zlib",
   MONGODB_BLOCK_COMPRESSOR: "zstd",
@@ -64,7 +62,7 @@ for (const k of COPY) {
   if (!v) { missing.push(k); continue; }
   out[k] = v;
 }
-for (const k of ["LINE_LOGIN_SCOPES", "N8N_PUSH_ENABLED", "SHEETS_PII_MODE"]) out[k] = dev[k] || DEFAULTS[k]!;
+for (const k of ["LINE_LOGIN_SCOPES", "N8N_PUSH_ENABLED"]) out[k] = dev[k] || DEFAULTS[k]!;
 for (const [k, gen] of Object.entries(FRESH)) out[k] = keepSecrets ? (dev[k] ?? gen()) : gen();
 out.ALLOWED_LIFF_ORIGINS = `https://${domain}`;
 // n8n คุยกับ Sheets เอง Vercel ไม่ต้องมี — ใส่ไว้เผื่ออนาคตย้ายมาฝั่ง API
@@ -87,7 +85,7 @@ if (missing.length) {
 }
 
 if (!keepSecrets) {
-  console.log("\n⚠️  PII_PEPPER ชุดใหม่นี้ห้ามเปลี่ยนอีกหลังมีข้อมูลจริง — เก็บสำรองไว้ที่ปลอดภัย");
+  console.log("\n⚠️  AI_HASH_PEPPER ชุดใหม่นี้มีผลกับ hash ใน line_crm_ai — เก็บสำรองไว้ที่ปลอดภัย");
   console.log("⚠️  INTERNAL_HMAC_SECRET ต้องเอาไปใส่ใน .env ของ n8n ให้ตรงกันด้วย");
 }
 console.log("\n📋 วิธีใช้: เปิดไฟล์ คัดลอกทั้งหมด → Vercel → Settings → Environment Variables");

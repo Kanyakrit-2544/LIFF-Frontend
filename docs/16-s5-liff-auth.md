@@ -77,7 +77,7 @@ LINE ใช้ user id เดียวกันทุก channel ที่อย
 ✅ payload ใน session cookie ถูกแก้ → BAD_SIGNATURE
 ✅ คนที่แอดเพื่อนมาก่อนแล้วเปิด LIFF → ไม่เกิดลูกค้าซ้ำ
 ✅ ชื่อจริงที่ลูกค้ากรอกไม่ถูกทับด้วยชื่อ LINE (regression จาก docs/12)
-✅ bootstrap ไม่คืน phoneEnc / phoneHash / lineUserId ออกไป
+✅ bootstrap ไม่คืน lineUserId / identity ภายใน / sync flags ออกไป
 ✅ field แปลกปลอมในฟอร์มถูกปฏิเสธ (mass assignment)
 ✅ consent ที่ required ต้องเป็น true เท่านั้น
 ```

@@ -30,14 +30,16 @@
 | GET | `/internal/customers/:id` | HMAC | n8n อ่านข้อมูล |
 | POST | `/internal/customers/upsert-from-line` | HMAC | n8n สั่ง upsert |
 | POST | `/internal/customers/merge` | HMAC | สั่ง merge |
-| GET | `/internal/sheets/pending` | HMAC | คิว dirty rows |
+| POST | `/internal/sheets/pending` | HMAC | คิว dirty rows |
 | POST | `/internal/sheets/ack` | HMAC | เคลียร์ dirty |
+| POST | `/internal/ai-mirror/pending` | HMAC | claim customer ที่ต้อง sync เข้า AI DB และคืน payload scrubbed |
+| POST | `/internal/ai-mirror/ack` | HMAC | เคลียร์ `aiSync.dirty` หลัง n8n เขียน AI DB สำเร็จ |
 | POST | `/internal/events/pending` | HMAC | claim คิว event ค้าง + แปลงเป็น payload ให้ n8n |
 | POST | `/internal/events/ack` | HMAC | ปิด event |
 | POST | `/internal/events/dead` | HMAC | ดู dead letter metadata |
 | POST | `/internal/logs/n8n-error` | HMAC | WF-E เขียน workflow error ลง audit log |
-| POST | `/pii/scrub` | HMAC | Python — ลบ PII |
-| POST | `/pii/restore` | HMAC | Python — เติม PII กลับ |
+| POST | `/pii/scrub` | HMAC | ยังไม่ build — ใช้ในอนาคตเมื่อมี free text / Presidio |
+| POST | `/pii/restore` | HMAC | ยังไม่ build — ใช้ในอนาคตเมื่อมี free text / Presidio |
 | GET | `/health` | — | liveness + Mongo ping |
 
 > **`/api/customer` และ `/api/customer/update` ตามที่โจทย์ระบุ** — ผมแยกเป็น `/liff/customer/*` (public, session) กับ `/internal/customers/*` (HMAC) แทน เพราะ endpoint เดียวที่รับทั้งสอง trust level คือแหล่งกำเนิด privilege escalation ที่พบบ่อยที่สุด
@@ -99,12 +101,12 @@ x-line-signature: <base64 HMAC-SHA256 ของ raw body ด้วย channel se
 ```jsonc
 { "ok": true,
   "customer": { "customerId": "cus_...", "displayName": "สมชาย ใจดี",
-                "pictureUrl": "https://...", "phoneMasked": "08x-xxx-1234",
+                "pictureUrl": "https://...",
                 "customerStatus": "lead", "isNew": false },
   "requestId": "01JQZX..." }
 ```
 
-**⚠️ ห้ามคืน:** `phoneEnc`, `phoneHash`, `emailEnc`, `_id` ภายในอื่น ๆ — คืนเฉพาะ masked
+**⚠️ ห้ามคืน:** `lineUserId`, identity ภายใน, `sheetSync`, `aiSync`, raw audit/debug field; phone/email ส่งคืนเฉพาะใน `bootstrap.prefill` ของเจ้าของ session
 **Rate limit:** 10 req/นาที/IP (ปกติเรียกครั้งเดียวต่อ session)
 
 ---
@@ -151,9 +153,9 @@ Idempotency-Key: liff_cus_01JQ..._1756180260
 1. verify session → `customerId` (**ไม่รับ customerId จาก body**)
 2. โหลด `form_schemas[formId@formVersion]` → `buildZodFromSchema()` → parse
    - ถ้า version นั้นไม่ `published` → `409 CONFLICT` + คืน schema ใหม่ให้ client reload
-3. normalize `phone` → E.164, `email` → lowercase → คำนวณ hash
-4. **identity check:** ถ้า `phoneHash` ตรงกับ customer อื่นที่ active → เรียก `mergeCustomers()`
-5. transaction: insert `customer_profiles` (revision+1) → update `customers` → insert `interactions{type:"form_submit"}` → `sheetSync.dirty = true`
+3. normalize `phone` → E.164, `email` → lowercase แล้วเก็บเป็น plaintext ใน `customers`
+4. **identity check:** ถ้า `phone` ตรงกับ customer อื่นที่ active → ตั้ง `pendingMerge` ไม่ merge อัตโนมัติ
+5. insert `customer_profiles` (revision+1) → update `customers` → insert `interactions{type:"form_submit"}` → `sheetSync.dirty = true` และ `aiSync.dirty = true`
 6. `waitUntil(notify n8n WF-B)`
 
 **Response**
@@ -303,7 +305,56 @@ server จะ `redact()` อีกชั้นก่อนบันทึกเ�
 
 ---
 
-## 3.10 `POST /api/pii/scrub` (Python runtime)
+## 3.9e `POST /api/internal/ai-mirror/pending`
+
+**Request**
+```jsonc
+{ "limit": 200 }
+```
+
+**Response**
+```jsonc
+{
+  "ok": true,
+  "claimId": "job_...",
+  "claimed": 1,
+  "rows": [{
+    "customerId": "cus_...",
+    "attempts": 0,
+    "customer": {
+      "_id": "cus_...",
+      "status": "active",
+      "displayName": "<PERSON_a3f9c001>",
+      "phone": "08x-xxx-5678",
+      "phoneHash": "64 hex chars",
+      "birthYear": 2535,
+      "syncedAt": "2026-08-27T04:00:00.000Z"
+    }
+  }]
+}
+```
+
+API เป็นคน scrub/mask/hash ก่อนส่งออกเสมอ เพื่อให้น8nไม่เห็นข้อมูลดิบจาก `line_crm_dev`
+
+---
+
+## 3.9f `POST /api/internal/ai-mirror/ack`
+
+**Request**
+```jsonc
+{ "claimId": "job_...",
+  "results": [
+  { "customerId": "cus_...", "status": "ok" },
+  { "customerId": "cus_...", "status": "error", "error": "Mongo write failed" }
+] }
+```
+
+`ok` → เคลียร์ `aiSync.dirty`, ตั้ง `aiSync.syncedAt` เฉพาะ claim เดิมและเฉพาะกรณี `updatedAt` ยังไม่ขยับหลัง claim
+`error` → เพิ่ม attempts, ปลด lock, ครบ 5 ครั้งจะนับเป็น stuck
+
+---
+
+## 3.10 `POST /api/pii/scrub` (future Python runtime)
 ```jsonc
 // request
 { "jobId": "job_01JQ...", "customerId": "cus_...",
@@ -344,15 +395,13 @@ MONGODB_DB=line_crm
 # Security
 SESSION_JWT_SECRET=             # openssl rand -base64 48
 INTERNAL_HMAC_SECRET=
-PII_KEY=                        # 32 bytes base64 — AES-256-GCM
-PII_PEPPER=                     # ห้ามเปลี่ยนหลัง production
+AI_HASH_PEPPER=                 # ใช้ HMAC ใน line_crm_ai เท่านั้น
 ALLOWED_LIFF_ORIGINS=https://<project>.vercel.app
 
 # n8n
 N8N_PUSH_ENABLED=false
 N8N_WEBHOOK_LINE=
 N8N_WEBHOOK_FORM=
-N8N_CALLBACK_SECRET=
 API_BASE=http://host.docker.internal:3000
 N8N_ENCRYPTION_KEY=
 

@@ -67,7 +67,7 @@ async function cleanup() {
   ]);
 }
 
-describe.runIf(() => available)("POST /api/liff/session", () => {
+describe.runIf(runIntegration)("POST /api/liff/session", () => {
   it("id_token ถูกต้อง → สร้างลูกค้า + ออก cookie", async () => {
     stubLineVerify(idTokenPayload());
     const res = await sessionPost(req({ idToken: "tok" }));
@@ -162,7 +162,7 @@ describe.runIf(() => available)("POST /api/liff/session", () => {
   });
 });
 
-describe.runIf(() => available)("GET /api/liff/bootstrap", () => {
+describe.runIf(runIntegration)("GET /api/liff/bootstrap", () => {
   it("ไม่มี cookie → 401", async () => {
     expect((await bootstrapGet()).status).toBe(401);
   });
@@ -199,7 +199,7 @@ describe.runIf(() => available)("GET /api/liff/bootstrap", () => {
     expect(j.prefill.fullNameTh).toBe("LINE ชื่อเล่น");
   });
 
-  it("⭐ ไม่คืนข้อมูลดิบที่เป็นความลับ (phoneEnc / phoneHash / lineUserId)", async () => {
+  it("⭐ ไม่คืน field ภายในหรือ LINE user id ออกไป", async () => {
     stubLineVerify(idTokenPayload());
     await sessionPost(req({ idToken: "tok" }));
     const text = await (await bootstrapGet()).text();

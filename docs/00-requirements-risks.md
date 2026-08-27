@@ -52,7 +52,7 @@
 | B. ส่ง LIFF link แบบมี token เฉพาะคน (`?t=<signed>`) ผ่าน broadcast/1-1 | แม่นยำ 100%, UX ดีที่สุด | ต้อง map ลูกค้าเก่า→LINE ก่อน (ยังแก้ไม่ได้), token รั่วได้ |
 | C. ไม่ match — ทุกคนที่มาจาก LINE = ลูกค้าใหม่ แล้ว merge ทีหลังด้วยเบอร์ | ง่ายสุด, POC เร็ว | มี duplicate ระหว่างทาง |
 
-**ผมเลือก C + A ผสม:** สร้าง customer จาก `lineUserId` ทันที (ไม่บล็อก flow) แล้วเมื่อลูกค้ากรอกเบอร์ → ระบบทำ **deterministic match ด้วย `phoneHash`** → ถ้าเจอลูกค้าเก่า ให้ **merge** (ไม่ใช่เขียนทับ) โดย merge เป็น operation ที่ audit ได้และ reversible
+**ผมเลือก C + A ผสม:** สร้าง customer จาก `lineUserId` ทันที (ไม่บล็อก flow) แล้วเมื่อลูกค้ากรอกเบอร์ → ระบบทำ **deterministic match ด้วย `phone` ที่ normalize แล้ว** → ถ้าเจอลูกค้าเก่า ให้ตั้ง `pendingMerge` ให้เจ้าหน้าที่ตรวจ ไม่ merge อัตโนมัติ
 **Trade-off:** มี duplicate ชั่วคราว แต่ไม่บล็อก UX และไม่ต้องรอ data cleaning ก่อน launch
 **เตรียมไว้สำหรับ B:** ออกแบบ `/api/liff/session` ให้รับ optional signed invite token ตั้งแต่แรก
 
@@ -112,11 +112,12 @@ n8n เหลือหน้าที่: trigger, routing, retry, fan-out, Shee
 
 ### RISK-6 🟡 PII เข้า AI Pipeline / เข้า Google Sheets
 **ปัญหา:** Sheets แชร์ให้พนักงานหลายคน = เบอร์/อีเมลลูกค้ากระจาย; AI model = ข้อมูลออกนอกระบบ
-**ทางแก้:**
-- Mongo เก็บ `phoneEnc` (AES-256-GCM) + `phoneHash` (HMAC-SHA256 + pepper) สำหรับ match — **ไม่เก็บ plaintext ใน field ที่ index**
-- Sheets ได้เฉพาะค่า mask `08x-xxx-1234` (ตั้ง config ได้ว่าจะ mask หรือไม่)
-- AI Pipeline: บังคับผ่าน `POST /api/pii/scrub` (Python) ก่อนเสมอ — ไม่มีทางเรียก AI โดยไม่ผ่าน scrubber เพราะ AI client ถูก wrap ไว้ใน `packages/ai` ที่ require token_map
-**Trade-off:** ค้นหาด้วยเบอร์แบบ partial (LIKE) ทำไม่ได้ — ต้องเป็น exact match เท่านั้น
+**ทางแก้หลัง S9:**
+- DB หลัก `line_crm_dev` เก็บ `phone`/`email` เป็น plaintext เพื่อให้ทีมงานและ Sheets ใช้ข้อมูลเต็มได้
+- จำกัดความเสี่ยงด้วย Mongo user แบบ Specific Privileges และ rotate user เก่าที่เคยหลุดในแชท
+- AI Pipeline อ่านได้เฉพาะ `line_crm_ai.customers_scrubbed` ที่ API scrub/mask/hash ให้แล้ว
+- n8n WF-D ไม่อ่าน DB หลักโดยตรง และ `mirror_user` ต้อง `readWrite` เฉพาะ `line_crm_ai`
+**Trade-off:** ใครได้ `MONGODB_URI` ของ app จะเห็น phone/email ดิบทั้งฐานทันที จึงต้องดูแล secret และสิทธิ์ DB เข้มกว่าเดิม
 
 ---
 

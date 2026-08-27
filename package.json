@@ -20,7 +20,8 @@
     "smoke:s4": "tsx --env-file=apps/web/.env.local scripts/smoke-s4.ts",
     "seed:form": "tsx --env-file=apps/web/.env.local scripts/seed-form-schema.ts",
     "env:vercel": "tsx scripts/make-vercel-env.ts",
-    "setup:sheet": "tsx --env-file=apps/web/.env.local scripts/setup-sheet.ts"
+    "setup:sheet": "tsx --env-file=apps/web/.env.local scripts/setup-sheet.ts",
+    "verify:db-users": "tsx scripts/verify-db-users.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

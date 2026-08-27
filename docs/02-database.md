@@ -39,13 +39,9 @@ identities (provider, externalId) ──unique──> customerId ──> custome
   "lineDisplayName": "Somchai",
   "pictureUrl": "https://profile.line-scdn.net/...",
 
-  // ── PII (ดู §2.6) ─────────────────────
-  "phoneHash": "a3f9...",          // HMAC-SHA256(E.164, PEPPER) — ใช้ match/dedupe
-  "phoneEnc": "v1:iv:ct:tag",      // AES-256-GCM
-  "phoneMasked": "08x-xxx-1234",   // ให้ Sheets / UI
-  "emailHash": "7c21...",
-  "emailEnc": "v1:iv:ct:tag",
-  "emailMasked": "so***@gmail.com",
+  // ── S9: DB หลักเก็บ plaintext normalized ─────────────────────
+  "phone": "+66812345678",
+  "email": "somchai@gmail.com",
 
   "customerStatus": "lead",        // lead | prospect | customer | inactive
   "tags": ["line-follower", "form-completed"],
@@ -80,6 +76,13 @@ identities (provider, externalId) ──unique──> customerId ──> custome
     "attempts": 0
   },
 
+  "aiSync": {
+    "dirty": true,
+    "syncedAt": null,
+    "lockedAt": null,
+    "attempts": 0
+  },
+
   "counters": { "milestones": 3, "formSubmits": 1 },   // นับเฉพาะ interactions ที่บันทึกจริง
 
   "firstInteractionAt": "2026-08-20T09:00:00Z",   // = ตอน follow — เขียนครั้งเดียว ($setOnInsert / $min)
@@ -93,15 +96,16 @@ identities (provider, externalId) ──unique──> customerId ──> custome
 
 **Index**
 ```js
-db.customers.createIndex({ phoneHash: 1 }, { sparse: true, name: "ix_phoneHash" })
-db.customers.createIndex({ emailHash: 1 }, { sparse: true, name: "ix_emailHash" })
+db.customers.createIndex({ phone: 1 }, { sparse: true, name: "ix_phone" })
+db.customers.createIndex({ email: 1 }, { sparse: true, name: "ix_email" })
 db.customers.createIndex({ "sheetSync.dirty": 1, "sheetSync.lockedAt": 1 }, { name: "ix_sheetSyncQueue" })
+db.customers.createIndex({ "aiSync.dirty": 1, "aiSync.lockedAt": 1 }, { name: "ix_aiSyncQueue" })
 db.customers.createIndex({ customerStatus: 1, createdAt: -1 })
 db.customers.createIndex({ mergedInto: 1 }, { sparse: true })
 db.customers.createIndex({ updatedAt: -1 })
 db.customers.createIndex({ firstMessageAt: 1 }, { sparse: true })   // หา follower ที่ยังไม่เคยทัก
 ```
-> ⚠️ **ไม่ทำ unique index บน `phoneHash`** โดยตั้งใจ — เพราะช่วง merge จะมี 2 record ถือเบอร์เดียวกันชั่วคราว ถ้า unique จะทำให้ write ล้มและ block flow ผู้ใช้ (ดู §2.5)
+> ⚠️ **ไม่ทำ unique index บน `phone`** โดยตั้งใจ — เพราะช่วง pending merge / merge จะมี 2 record ถือเบอร์เดียวกันชั่วคราว ถ้า unique จะทำให้ write ล้มและ block flow ผู้ใช้ (ดู §2.5)
 
 ---
 
@@ -350,16 +354,16 @@ resolveCustomer(provider, channelId, externalId, hints?) :
                 return { customerId, isNew: false }
 
   2. ไม่เจอ → deterministic match จาก hints:
-     a. hints.phoneHash → customers.findOne({phoneHash, status:"active"})
-     b. hints.emailHash → customers.findOne({emailHash, status:"active"})
+     a. hints.phone → customers.findOne({phone, status:"active"})
+     b. hints.email → customers.findOne({email, status:"active"})
      → ถ้าเจอ: link identity เข้า customer เดิม, return { customerId, isNew:false, linked:true }
 
   3. ไม่เจอทั้งหมด → สร้าง customer ใหม่ + identity ใหม่ (ใน transaction)
      return { customerId, isNew: true }
 ```
 
-**เจตนา:** ตอน `follow` เรายังไม่มีเบอร์ → ได้ customer ใหม่ (ขั้นตอน 3); ตอนกรอกฟอร์มมีเบอร์ → เข้าขั้นตอน 2 → **merge**
-**Confidence tier:** verified identity (LINE ID token) = high; เบอร์ที่ผู้ใช้พิมพ์เอง = medium → merge อัตโนมัติได้ แต่ log ไว้ให้ย้อนได้
+**เจตนา:** ตอน `follow` เรายังไม่มีเบอร์ → ได้ customer ใหม่ (ขั้นตอน 3); ตอนกรอกฟอร์มมีเบอร์ → ถ้าเบอร์ตรงกับอีกคนจะตั้ง `pendingMerge`
+**Confidence tier:** verified identity (LINE ID token) = high; เบอร์ที่ผู้ใช้พิมพ์เอง = medium → ไม่ auto-merge แล้ว ต้องให้เจ้าหน้าที่ตรวจหรือยืนยันเบอร์ก่อน
 
 ---
 
@@ -375,30 +379,32 @@ merge(loser, winner):
       $min: { firstInteractionAt: loserDoc.firstInteractionAt },
       $max: { lastInteractionAt:  loserDoc.lastInteractionAt },
       $addToSet: { sources: {$each: loserDoc.sources}, tags: {$each: loserDoc.tags} },
-      $set: { "sheetSync.dirty": true },
+      $set: { "sheetSync.dirty": true, "aiSync.dirty": true },
       // field ว่างของ winner เติมจาก loser (fill-forward ไม่ทับของที่มีอยู่)
     })
-    customers.updateOne({_id: loser}, {$set:{status:"merged", mergedInto: winner, "sheetSync.dirty": true}})
+    customers.updateOne({_id: loser}, {$set:{status:"merged", mergedInto: winner, "sheetSync.dirty": true, "aiSync.dirty": true}})
     audit_logs.insertOne({action:"customer.merge", ...})
   })
 ```
 **กติกาเลือก winner:** (1) มี verified identity มากกว่า → (2) `createdAt` เก่ากว่า → (3) มีข้อมูลครบกว่า
 **ทำไมไม่ลบ loser:** LINE/Sheets/Meta อาจยังถือ id เก่าอยู่ → tombstone ทำให้ resolve ตามไปเจอ winner ได้ และ **undo ได้**
-**ต้องทำ:** Sheets row ของ loser ต้องถูก mark `MERGED → cus_winner` ไม่ใช่ปล่อยค้าง
+**ต้องทำ:** Sheets และ AI mirror row ของ loser ต้องถูก mark `MERGED → cus_winner` ไม่ใช่ปล่อยค้าง
 
 ---
 
-## 2.6 PII Handling Pattern
+## 2.6 PII Handling Pattern หลัง S9
 
 | Field | เก็บยังไง | ใช้ทำอะไร |
 |---|---|---|
-| `phoneHash` | HMAC-SHA256(E.164, `PII_PEPPER`) | index, dedupe, match — **ย้อนกลับไม่ได้** |
-| `phoneEnc` | AES-256-GCM(`PII_KEY`) | ให้พนักงานที่มีสิทธิ์ decrypt ดู |
-| `phoneMasked` | `08x-xxx-1234` | Sheets, UI, log |
+| `customers.phone` | plaintext E.164 เช่น `+66812345678` | exact match, pending merge, Sheets |
+| `customers.email` | plaintext lowercase | exact match, Sheets |
+| `customers_scrubbed.phone` | mask เช่น `08x-xxx-5678` | ให้ AI/operator เห็นบริบทโดยไม่เห็นเบอร์เต็ม |
+| `customers_scrubbed.phoneHash` | HMAC-SHA256 ด้วย `AI_HASH_PEPPER` | จับกลุ่มซ้ำใน AI DB โดยไม่รู้เบอร์ |
 
-- normalize ก่อน hash เสมอ: `0812345678` → `+66812345678`; email → lowercase + trim
-- key rotation: prefix `v1:` ในค่า ciphertext ตั้งแต่แรก → เปลี่ยน key ได้โดยไม่พัง
-- **`PII_PEPPER` ห้ามเปลี่ยน** (เปลี่ยน = hash เดิมใช้ไม่ได้ทั้งฐาน) → เก็บแยกจาก `PII_KEY`
+- normalize ก่อนเก็บเสมอ: `0812345678` → `+66812345678`; email → lowercase + trim
+- DB หลักปลอดภัยด้วย Mongo user privileges แทน field encryption
+- n8n ห้ามอ่าน `line_crm_dev` ตรง ๆ; WF-D ดึงข้อมูลที่ scrub แล้วจาก API เท่านั้น
+- `AI_HASH_PEPPER` ต้องแยกจาก secret อื่น และใช้เฉพาะ AI mirror
 
 ---
 

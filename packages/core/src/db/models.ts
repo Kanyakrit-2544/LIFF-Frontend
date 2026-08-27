@@ -13,7 +13,9 @@ export const COLLECTIONS = {
   auditLogs: "audit_logs",
 } as const;
 
-export type EncryptedField = { hash: string; enc: string; masked: string };
+export const AI_COLLECTIONS = {
+  customersScrubbed: "customers_scrubbed",
+} as const;
 
 export type IdentityProvider =
   | "line"
@@ -42,10 +44,9 @@ export interface CustomerDoc {
   facebook: string | null;
   instagram: string | null;
 
-  phone: EncryptedField | null;
-  email: EncryptedField | null;
-  phoneHash: string | null; // ยกออกมาระดับบนสุดเพื่อทำ index (sparse)
-  emailHash: string | null;
+  /** S9: DB หลักเป็น plaintext normalized — จำกัดสิทธิ์ด้วย Mongo user แทน encryption ใน field */
+  phone: string | null;
+  email: string | null;
 
   customerStatus: CustomerStatus;
   tags: string[];
@@ -73,6 +74,15 @@ export interface CustomerDoc {
   sheetSync: {
     dirty: boolean;
     rowKey: string;
+    syncedAt: Date | null;
+    lockedAt: Date | null;
+    attempts: number;
+    /** ตีตราตอนจองงาน — กัน worker สองตัวหยิบแถวเดียวกัน */
+    claimId?: string;
+  };
+
+  aiSync: {
+    dirty: boolean;
     syncedAt: Date | null;
     lockedAt: Date | null;
     attempts: number;

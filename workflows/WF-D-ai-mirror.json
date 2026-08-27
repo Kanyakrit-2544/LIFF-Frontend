@@ -1,0 +1,304 @@
+{
+  "id": "wfd-ai-mirror",
+  "name": "WF-D — AI Mirror",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "cron",
+      "name": "Schedule (10 min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ขอข้อมูลที่ scrub แล้วจาก API เท่านั้น — n8n ไม่อ่าน line_crm_dev และไม่เห็นข้อมูลดิบ\nconst crypto = require('crypto');\nconst payload = { limit: 200 };\nconst body = JSON.stringify(payload);\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type': 'application/json', 'x-signature': signature, 'x-timestamp': String(ts) } } }];"
+      },
+      "id": "sign-claim",
+      "name": "Sign Claim",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE}}/api/internal/ai-mirror/pending",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{$json.headers['content-type']}}"
+            },
+            {
+              "name": "x-signature",
+              "value": "={{$json.headers['x-signature']}}"
+            },
+            {
+              "name": "x-timestamp",
+              "value": "={{$json.headers['x-timestamp']}}"
+            }
+          ]
+        }
+      },
+      "id": "claim-customers",
+      "name": "Claim Customers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-claimed",
+              "leftValue": "={{ $json.claimed }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-customers",
+      "name": "Has Customers?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows = $('Claim Customers').first().json.rows || [];\nreturn rows.map((r) => ({ json: { ...r.customer, customerId: r.customerId } }));"
+      },
+      "id": "prepare-upserts",
+      "name": "Prepare Upserts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "customers_scrubbed",
+        "updateKey": "_id",
+        "fields": "={{ JSON.stringify($json) }}"
+      },
+      "id": "upsert-ai-db",
+      "name": "Upsert AI DB",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        0
+      ],
+      "credentials": {
+        "mongoDb": {
+          "id": "__SET_IN_N8N_UI__",
+          "name": "mirror_user line_crm_ai"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const claim = $('Claim Customers').first().json;\nconst ids = (claim.rows || []).map((r) => r.customerId);\nconst results = ids.map((customerId) => ({ customerId, status: 'ok' }));\nconst crypto = require('crypto');\nconst body = JSON.stringify({ claimId: claim.claimId, results });\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type': 'application/json', 'x-signature': signature, 'x-timestamp': String(ts) } } }];"
+      },
+      "id": "sign-ack",
+      "name": "Sign Ack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE}}/api/internal/ai-mirror/ack",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{$json.headers['content-type']}}"
+            },
+            {
+              "name": "x-signature",
+              "value": "={{$json.headers['x-signature']}}"
+            },
+            {
+              "name": "x-timestamp",
+              "value": "={{$json.headers['x-timestamp']}}"
+            }
+          ]
+        }
+      },
+      "id": "ack-mirror",
+      "name": "Ack Mirror",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Schedule (10 min)": {
+      "main": [
+        [
+          {
+            "node": "Sign Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Claim": {
+      "main": [
+        [
+          {
+            "node": "Claim Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Customers": {
+      "main": [
+        [
+          {
+            "node": "Has Customers?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Customers?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Upserts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Prepare Upserts": {
+      "main": [
+        [
+          {
+            "node": "Upsert AI DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert AI DB": {
+      "main": [
+        [
+          {
+            "node": "Sign Ack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Ack": {
+      "main": [
+        [
+          {
+            "node": "Ack Mirror",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "errorWorkflow": "wfe-error-handler"
+  },
+  "active": false,
+  "versionId": "1",
+  "meta": {}
+}

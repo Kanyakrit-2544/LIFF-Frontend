@@ -59,7 +59,10 @@ line-crm/
 │   │   │   ├── customers/
 │   │   │   │   ├── upsertFromLine.ts
 │   │   │   │   ├── applyFormSubmission.ts
-│   │   │   │   └── toSheetRow.ts        # mask + จัดคอลัมน์
+│   │   │   │   └── toSheetRow.ts        # plaintext → จัดคอลัมน์ชีต
+│   │   │   ├── ai/
+│   │   │   │   ├── scrubCustomer.ts     # CustomerDoc → scrubbed AI payload
+│   │   │   │   └── aiMirror.ts          # claim / ack คิว line_crm_ai
 │   │   │   ├── forms/
 │   │   │   │   ├── schemaStore.ts
 │   │   │   │   └── buildZod.ts          # JSON schema → zod (มี test ครบ)
@@ -68,7 +71,7 @@ line-crm/
 │   │   │   │   ├── lineIdToken.ts       # verify + cache
 │   │   │   │   ├── internalHmac.ts      # sign + verify + replay window
 │   │   │   │   ├── session.ts           # JWT cookie
-│   │   │   │   └── pii.ts               # encrypt / decrypt / hash / mask
+│   │   │   │   └── pii.ts               # hash / mask สำหรับ AI mirror
 │   │   │   ├── events/
 │   │   │   │   ├── inbox.ts             # enqueue / claim / ack
 │   │   │   │   └── publisher.ts         # ยิง n8n + waitUntil
@@ -76,8 +79,7 @@ line-crm/
 │   │   │   └── logger.ts                # structured + redact PII อัตโนมัติ
 │   │   └── tests/
 │   │
-│   └── ai/                              # wrapper ที่บังคับให้ผ่าน scrubber
-│       └── src/client.ts                # callAI(payload, scrubReceipt) — ไม่มี receipt = compile error
+│   └── ai/                              # ยังไม่ใช้ — รอ S10/S11 หรือ Presidio จริง
 │
 ├── services/
 │   └── pii/                             # Python — ⚠️ critical path ของ WF-C
@@ -95,7 +97,7 @@ line-crm/
 │   ├── WF-A-line-event.json
 │   ├── WF-B-form-submitted.json
 │   ├── WF-C-sheets-sync.json
-│   ├── WF-D-reconciler.json
+│   ├── WF-D-ai-mirror.json
 │   ├── WF-E-error-handler.json
 │   └── scripts/strip-credentials.mjs
 │
@@ -135,9 +137,8 @@ line-crm/
 | **S5** | `/liff/session` + `/liff/bootstrap` + form_schemas + seed | auth แน่นหนา, form config-driven | 1 วัน |
 | **S6** | **LIFF UI** (Phase 5 ของโจทย์) | ผู้ใช้จริงกรอกได้ | 1.5 วัน |
 | **S7** | `/liff/customer/profile` + merge logic | ข้อมูลเข้า Mongo + merge ลูกค้าเก่าได้ | 1 วัน |
-| **S8a** | `services/pii` — แกะ scrubber/restore เป็น service + deploy | AI ไม่เห็น PII | 1 วัน |
-| **S8b** | WF-C: scrub → AI → restore → Sheets + `toSheetRow` | พนักงานเห็นข้อมูล | 1 วัน |
-| **S9** | WF-D reconciler + rate limit + testing checklist | ระบบทนพัง | 0.5 วัน |
+| **S8** | WF-C: Mongo → `toSheetRow` → Sheets | พนักงานเห็นข้อมูล | เสร็จแล้ว |
+| **S9** | Plaintext DB + scrubbed AI mirror + WF-D | AI อ่านได้เฉพาะ DB ปลอดภัย | เสร็จแล้ว |
 | **S10** | *(ว่าง — เดิมคือ services/pii ย้ายไป S8a แล้ว)* | | |
 | **S11** | Meta stub + `/internal/leads/ingest` | พิสูจน์ว่าขยายได้ | 0.5 วัน |
 

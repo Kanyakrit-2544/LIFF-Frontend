@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from "vitest";
 import { closeClient, getDb } from "../src/db/client";
 import { ensureIndexes } from "../src/db/indexes";
-import { COLLECTIONS, type CustomerDoc, type InteractionDoc } from "../src/db/models";
+import { COLLECTIONS, type CustomerDoc, type IdentityDoc, type InteractionDoc } from "../src/db/models";
 import { upsertFromLine } from "../src/customers/upsertFromLine";
 
 let available = false;
@@ -93,6 +93,7 @@ describe.runIf(runIntegration)("S3 upsertFromLine", () => {
     expect(customer?.firstInteractionAt?.toISOString()).toBe(occurredAt.toISOString());
     expect(customer?.firstMessageAt).toBeUndefined();
     expect(customer?.sheetSync.dirty).toBe(true);
+    expect(customer?.aiSync.dirty).toBe(true);
     expect(customer?.lineDisplayName).toBe("Somchai 2");
   });
 
@@ -134,7 +135,11 @@ describe.runIf(runIntegration)("S3 upsertFromLine", () => {
       occurredAt: firstAt,
       message: { type: "text" },
     });
-    await (await customers()).updateOne({ _id: first.customerId }, { $set: { "sheetSync.dirty": false, customerStatus: "customer" } });
+    await (await customers()).updateOne({
+      _id: first.customerId,
+    }, {
+      $set: { "sheetSync.dirty": false, "aiSync.dirty": false, customerStatus: "customer" },
+    });
 
     const second = await upsertFromLine({
       eventId: eventId("EV-MSG-2"),
@@ -154,6 +159,7 @@ describe.runIf(runIntegration)("S3 upsertFromLine", () => {
     expect(customer?.firstMessageAt?.toISOString()).toBe(firstAt.toISOString());
     expect(customer?.lastInteractionAt?.toISOString()).toBe(secondAt.toISOString());
     expect(customer?.sheetSync.dirty).toBe(false);
+    expect(customer?.aiSync.dirty).toBe(false);
     expect(customer?.customerStatus).toBe("customer");
   });
 
@@ -219,7 +225,8 @@ describe.runIf(runIntegration)("ชื่อลูกค้าต้องไม
     });
 
     const col = await customers();
-    const created = await col.findOne({});
+    const identity = await (await getDb()).collection<IdentityDoc>(COLLECTIONS.identities).findOne({ externalId: userId });
+    const created = await col.findOne({ _id: identity!.customerId });
     // ลูกค้ากรอกชื่อจริงผ่านฟอร์ม LIFF
     await col.updateOne({ _id: created!._id }, { $set: { displayName: "สมชาย ใจดี" } });
 

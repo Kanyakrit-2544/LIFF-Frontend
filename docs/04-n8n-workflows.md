@@ -148,11 +148,28 @@ LLM ตอบผิดรูปได้เสมอ ถ้าปล่อยผ
 
 ---
 
-## WF-D — Reconciler / Safety Net
+## WF-D — AI Mirror (S9)
 
-**S4 เปลี่ยนแล้ว:** ไม่มี WF-D แยกใน implementation ปัจจุบัน เพราะ WF-A มี Schedule Trigger ที่ล้างคิวทั้งหมดอยู่แล้ว และ `/api/internal/events/pending` จะ `releaseStaleClaims()` ก่อน claim ทุกครั้ง
+**Trigger:** Schedule ทุก 10 นาที
 
-ถ้า production ในอนาคตต้องแยก reconciler เพื่อประหยัด execution หรือปรับ SLA ค่อยสร้าง WF-D ใหม่ได้ แต่ S4 ไม่ต้องมี workflow แยก
+```
+Schedule
+  → Sign Claim (HMAC)
+  → POST /api/internal/ai-mirror/pending
+  → ถ้ามี rows
+  → Upsert MongoDB line_crm_ai.customers_scrubbed
+  → Sign Ack (HMAC)
+  → POST /api/internal/ai-mirror/ack
+```
+
+กฎสำคัญ:
+
+- n8n ไม่อ่าน `line_crm_dev` ตรง ๆ
+- payload จาก `/pending` เป็นข้อมูล scrubbed แล้วเท่านั้น
+- MongoDB credential ใน n8n ต้องเป็น `mirror_user` ที่ `readWrite` เฉพาะ `line_crm_ai`
+- ถ้า Mongo node เขียนล้มเหลว workflow จะไม่ ack; lock จะถูกปลดหลัง lease หมดและลองใหม่
+
+**Export:** `workflows/WF-D-ai-mirror.json`
 
 ---
 
@@ -183,7 +200,7 @@ Meta Webhook (leadgen)
   → GET https://graph.facebook.com/v21.0/{leadgen_id}?access_token=...
   → Map field_data → { fullName, phone, email, campaignId, adId }
   → POST /api/internal/leads/ingest
-       ├─ resolveCustomer("lead_ads", pageId, leadgen_id, hints:{phoneHash, emailHash})
+       ├─ resolveCustomer("lead_ads", pageId, leadgen_id, hints:{phone, email})
        ├─ เจอลูกค้าเดิม → link identity + $addToSet sources:"facebook"
        └─ ไม่เจอ → สร้างใหม่ source.channel = "facebook"
   → sheetSync.dirty = true  (WF-C เก็บต่อเอง ไม่ต้องเขียน Sheets ที่นี่)
@@ -199,7 +216,7 @@ Meta Webhook (leadgen)
 | WF-A | `eventId` (unique index) | interaction ไม่ถูกสร้างซ้ำ, customer upsert = no-op |
 | WF-B | `customerId + revision` | alert อาจส่งซ้ำ (ยอมรับได้) — ป้องกันด้วย dedupe cache |
 | WF-C | `customerId` = row key | เขียนทับแถวเดิมด้วยค่าเดิม = ปลอดภัย |
-| WF-D | รวมเข้า WF-A ใน S4 | `/events/pending` ปลด stale claim + WF-A ล้างคิวทุก trigger |
+| WF-D | `customerId` | upsert `_id` เดิมใน `line_crm_ai.customers_scrubbed`; ack ซ้ำไม่ทำให้ข้อมูลเพี้ยน |
 
 ## 4.2 n8n Credential ที่ต้องตั้ง
 | ชื่อ | Type | ใช้ที่ |
@@ -207,6 +224,7 @@ Meta Webhook (leadgen)
 | `LINE Messaging API` | Header Auth `Bearer <token>` | WF-A node 6a, 11 |
 | `Internal API HMAC` | Header Auth (คำนวณใน Code node) | ทุก `/api/internal/*` |
 | `Google Sheets SA` | Service Account | WF-C |
+| `mirror_user line_crm_ai` | MongoDB | WF-D — readWrite เฉพาะ `line_crm_ai` |
 | `Alert Channel` | — | ยังไม่ใช้ใน S4; WF-E log เข้า `audit_logs` เท่านั้น |
 
 ## 4.3 Export & Version Control

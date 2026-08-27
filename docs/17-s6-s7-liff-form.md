@@ -65,12 +65,12 @@ field ที่ winner ว่างจะเติมจาก loser (fill-forwa
 แก้ด้วย `safeAfter()` ที่หุ้ม try/catch สองชั้น — งานเบื้องหลังเป็น best-effort เสมอ
 (n8n มี pull mode คอยเก็บตกอยู่แล้ว) ใช้กับ `/api/webhook/line` ด้วยเพราะเสี่ยงแบบเดียวกัน
 
-### 🟠 `PII_KEY` ใน `.env.local` decode ได้ 29 ไบต์ ไม่ใช่ 32
+### 🟠 Historical pre-S9: `PII_KEY` ใน `.env.local` decode ได้ 29 ไบต์ ไม่ใช่ 32
 
 ค่าที่ผมใส่ไว้ตั้งแต่ S1 ผิด — env validation จับได้ถูกต้อง แต่แปลว่า **เส้นทางเข้ารหัส PII ไม่เคยถูกใช้จริงเลย**
 จนกระทั่งฟอร์มตัวแรกถูกส่ง (S1–S5 ไม่มีการเขียนเบอร์/อีเมล) สร้างใหม่แล้ว
 
-> ⚠️ ถ้าเปลี่ยน `PII_KEY` หลังมีข้อมูลจริง จะถอดรหัสของเก่าไม่ได้ — ตอนนี้ยังไม่มีข้อมูลจริงจึงแก้ได้ฟรี
+> S9 ถอด `PII_KEY`/field encryption ออกจาก DB หลักแล้ว ข้อมูลส่วนนี้เป็นบันทึกเหตุการณ์เก่า ไม่ใช่ design ปัจจุบัน
 
 ### 🟡 test ของผมเองเปราะ
 เทส "ไม่เกิดลูกค้าซ้ำ" นับ `customers` ทั้ง collection ซึ่งชนกับ test file อื่นที่ vitest รันขนาน — แก้ให้นับเฉพาะของตัวเอง
@@ -92,14 +92,12 @@ field ที่ winner ว่างจะเติมจาก loser (fill-forwa
 ข้อมูลที่เข้า Atlas จริง:
 ```json
 { "displayName": "สมชาย ใจดี", "nickname": "ชาย", "birthYear": 2535,
-  "phoneMasked": "08x-xxx-5678", "emailMasked": "so***@gmail.com",
-  "phoneHash": "dafcf3cd2a9cd9cb…",
+  "phone": "+66812345678", "email": "somchai@gmail.com",
   "consent": { "dataProcessing": true, "marketing": true, "version": "v1",
                "grantedAt": "...", "ip": "...", "userAgent": "..." },
   "tags": ["form-completed"], "counters": { "formSubmits": 1 },
   "sheetSyncDirty": true }
 
-ถอดรหัสกลับได้: +66812345678 | somchai@gmail.com
 customer_profiles revision 1 — เบอร์ normalize เป็น E.164, อีเมลเป็นตัวพิมพ์เล็ก
 interactions: ["form_submit"]
 ```

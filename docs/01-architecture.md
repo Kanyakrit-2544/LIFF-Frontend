@@ -148,7 +148,7 @@ sequenceDiagram
     U->>F: กรอก + Submit
     F->>V: POST /api/liff/customer/profile { answers, idempotencyKey }
     V->>V: zod validate ตาม formSchema version
-    V->>M: insert customer_profiles (revision++)<br/>upsert customers (phoneHash match → merge?)<br/>sheetSync.dirty = true
+    V->>M: insert customer_profiles (revision++)<br/>update customers (phone match → pendingMerge)<br/>sheetSync.dirty + aiSync.dirty = true
     V-->>F: 200 { status: "accepted" }
     F->>U: Success screen
     Note over V: waitUntil → n8n
@@ -165,12 +165,10 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    CRON["n8n Cron<br/>ทุก 2 นาที"] --> GET["GET /api/internal/sheets/pending?limit=200"]
+    CRON["n8n Cron<br/>ทุก 2 นาที"] --> GET["POST /api/internal/sheets/pending<br/>(HMAC)"]
     GET --> LOCK[("Mongo: set sheetSync.lockedAt<br/>findAndModify")]
-    LOCK --> SCRUB["POST /api/pii/scrub<br/>(Python)"]
-    SCRUB --> AI["AI node ใน n8n<br/>❓ ยังไม่กำหนดหน้าที่"]
-    AI --> REST["POST /api/pii/restore"]
-    REST --> READ["Sheets: read column A<br/>(customerId → rowIndex map)"]
+    LOCK --> ROW["API: toSheetRow<br/>phone/email plaintext"]
+    ROW --> READ["Sheets: read column A<br/>(customerId → rowIndex map)"]
     READ --> SPLIT{"มี row อยู่แล้ว?"}
     SPLIT -->|ใช่| UPD["values.batchUpdate<br/>(หลาย row ครั้งเดียว)"]
     SPLIT -->|ไม่| APP["values.append"]
@@ -179,29 +177,24 @@ flowchart LR
     ACK --> CLR[("dirty=false<br/>syncedAt=now")]
 ```
 
-**Privacy Layer:** AI เห็นแค่ placeholder (`<PERSON_7c21>`, `<TH_PHONE_a3f9>`) ไม่เคยเห็นข้อมูลจริง
-ตรงตาม pipeline ในโจทย์ `Raw Data → Scrubber → AI Processing → Restore / Mapping → Database`
+**Privacy:** WF-C ไม่ผ่าน AI แล้ว จึงเขียนข้อมูลเต็มให้ Sheets ได้ตรงจาก DB หลัก
 
 **Idempotency:** ถ้า ack ไม่ถึง → รอบหน้า sync ซ้ำ → เขียนทับ row เดิม (ค่าเท่ากัน) = ปลอดภัย
 
 ---
 
-## 1.7 Data Flow D — Privacy / AI Pipeline (เตรียมไว้ ยังไม่ build)
+## 1.7 Data Flow D — AI Mirror (S9)
 
 ```mermaid
 flowchart LR
-    RAW["Raw Data<br/>(Mongo / chat log)"] --> SCRUB["POST /api/pii/scrub<br/>(Python)"]
-    SCRUB --> TOK[("pii_tokens<br/>token ↔ encrypted value")]
-    SCRUB --> CLEAN["Scrubbed Payload<br/>[NAME_1] [PHONE_1]"]
-    CLEAN --> AI["AI Processing<br/>(Claude / classify / summarize)"]
-    AI --> OUT["AI Output<br/>ยังมี [NAME_1]"]
-    OUT --> REST["POST /api/pii/restore"]
-    TOK --> REST
-    REST --> FINAL["Final Result"]
-    FINAL --> MONGO[("MongoDB")]
+    CRON["n8n Cron<br/>ทุก 10 นาที"] --> GET["POST /api/internal/ai-mirror/pending<br/>(HMAC)"]
+    GET --> SCRUB["API scrubCustomer<br/>mask + AI_HASH_PEPPER"]
+    SCRUB --> N8N["n8n ได้เฉพาะ scrubbed rows"]
+    N8N --> AIDB[("line_crm_ai<br/>customers_scrubbed")]
+    AIDB --> ACK["POST /api/internal/ai-mirror/ack"]
 ```
 
-**บังคับด้วย code ไม่ใช่ด้วยวินัย:** AI client ถูก wrap ไว้ที่ `packages/ai/client.ts` ซึ่ง **require argument `scrubReceipt`** — เรียก AI โดยไม่ผ่าน scrubber จะ compile ไม่ผ่าน
+**บังคับด้วย privilege + API boundary:** `mirror_user` ไม่มีสิทธิ์อ่าน `line_crm_dev`; n8n จึงอ่านข้อมูลดิบไม่ได้ และ AI ใช้ `ai_user` ที่อ่านได้เฉพาะ `line_crm_ai`
 
 ---
 

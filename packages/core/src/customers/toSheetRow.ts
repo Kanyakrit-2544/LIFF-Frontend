@@ -1,5 +1,3 @@
-import { decrypt } from "../security/pii";
-import { env } from "../env";
 import { ageFromBirthYearBE } from "../identity/normalize";
 import { log } from "../logger";
 import type { CustomerDoc } from "../db/models";
@@ -25,18 +23,6 @@ export interface SheetColumn {
 const d = (v: Date | null | undefined) => (v ? v.toISOString().slice(0, 10) : "");
 const dt = (v: Date | null | undefined) => (v ? v.toISOString().slice(0, 16).replace("T", " ") : "");
 
-/** ถอดรหัสไม่ได้ (เช่นหมุน key) ต้องไม่ทำให้ sync ทั้งรอบล้ม */
-function pii(enc: string | undefined | null, masked: string | undefined | null): string {
-  if (!enc) return "";
-  if (env("sheets").SHEETS_PII_MODE !== "full") return masked ?? "";
-  try {
-    return decrypt(enc);
-  } catch (e) {
-    log.warn("ถอดรหัส PII สำหรับ Sheets ไม่ได้ ใช้ค่า mask แทน", { error: (e as Error).message });
-    return masked ?? "";
-  }
-}
-
 export const SHEET_COLUMNS: SheetColumn[] = [
   { id: "customerId", header: "Customer ID", owner: "system", value: (c) => c._id },
   { id: "fullNameTh", header: "ชื่อ-นามสกุล", owner: "system", value: (c) => c.displayName ?? "" },
@@ -44,8 +30,8 @@ export const SHEET_COLUMNS: SheetColumn[] = [
   { id: "fullNameEn", header: "Name Eng.", owner: "system", value: (c) => c.fullNameEn ?? "" },
   { id: "birthYear", header: "ปีเกิด (พ.ศ.)", owner: "system", value: (c) => (c.birthYear ? String(c.birthYear) : "") },
   { id: "age", header: "อายุ", owner: "system", value: (c) => (c.birthYear ? String(ageFromBirthYearBE(c.birthYear)) : "") },
-  { id: "phone", header: "เบอร์", owner: "system", value: (c) => pii(c.phone?.enc, c.phone?.masked) },
-  { id: "email", header: "อีเมล", owner: "system", value: (c) => pii(c.email?.enc, c.email?.masked) },
+  { id: "phone", header: "เบอร์", owner: "system", value: (c) => c.phone ?? "" },
+  { id: "email", header: "อีเมล", owner: "system", value: (c) => c.email ?? "" },
   { id: "lineDisplayName", header: "ชื่อใน LINE", owner: "system", value: (c) => c.lineDisplayName ?? "" },
   { id: "facebook", header: "Facebook", owner: "system", value: (c) => c.facebook ?? "" },
   { id: "instagram", header: "Instagram", owner: "system", value: (c) => c.instagram ?? "" },
