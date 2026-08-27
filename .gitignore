@@ -21,3 +21,11 @@ next-env.d.ts
 vercel.env.txt
 .vercel
 .env*
+
+# Google service account (มี private key)
+*.iam.gserviceaccount.json
+liff-*.json
+google-service-account.json
+
+# build cache
+*.tsbuildinfo

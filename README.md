@@ -32,6 +32,8 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 15 | [S4 — ผลรีวิว](docs/15-s4-review.md) | บั๊ก 8 จุดที่เจอตอนรัน n8n จริง + ผลทดสอบ |
 | 16 | [S5 — LIFF Auth + Form Schema](docs/16-s5-liff-auth.md) | id_token verify, session cookie, form schema จาก DB |
 | 17 | [S6+S7 — หน้า LIFF + รับข้อมูล](docs/17-s6-s7-liff-form.md) | UI, merge, idempotency, ผลทดสอบจริง |
+| 18 | [S7 — ตรวจความปลอดภัย](docs/18-s7-security-review.md) | injection, ช่องโหว่ดูดข้อมูลด้วยเบอร์, rate limit, logging |
+| 19 | [S8 — Google Sheets Sync](docs/19-s8-sheets-sync.md) | นิยามคอลัมน์, คิวซิงก์, WF-C, ผลทดสอบจริง |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
 ## Design Decisions (ยืนยันแล้ว)
@@ -40,15 +42,15 @@ LINE User ──> LIFF ──> Vercel ───────┘
 |---|---|---|
 | D1 | Sheets sync latency | รับได้ 0–2 นาที → ใช้ batch reconcile ทุก 2 นาที |
 | D2 | ทิศทาง Sheets | **One-way เท่านั้น** (Mongo → Sheets) พนักงานไม่แก้กลับ |
-| D3 | Customer merge | **Auto-merge** เมื่อ `phoneHash` ตรง (ไม่ต้องให้คนกดยืนยัน) |
+| D3 | Customer merge | ~~Auto-merge~~ → **ตั้งธง `pendingMerge` ให้คนตรวจ** — auto-merge เปิดช่องยึดข้อมูลด้วยเบอร์ (docs/18) |
 | D4 | เก็บบทสนทนา | **ไม่เก็บ** — บันทึกเฉพาะ `follow` + `first_message` เท่านั้น, redact ข้อความตั้งแต่ webhook |
 | D5 | PDPA consent | **จำเป็น** — มี consent object + หลักฐานการยินยอม |
 | D6 | ลำดับ implement | S1 → S11 ตาม docs/05 |
 | D7 | n8n dev | Docker บนเครื่อง + **pull mode** (ไม่ต้อง host, ไม่ต้อง tunnel) |
 | D8 | n8n prod | Cloud-hosted — เปลี่ยนแค่ `N8N_PUSH_ENABLED=true` |
 | D9 | Privacy layer | `Mongo → scrub → AI → restore → Sheets` — `services/pii` อยู่ใน critical path |
-| D10 | หน้าที่ AI | บันทึกข้อมูลจาก LIFF ลงชีต โดย **match กับ Column ID** — ตัดสินเฉพาะเนื้อหา ไม่ตัดสินว่าเขียนแถวไหน |
-| D11 | AI model | **OpenAI / ChatGPT** (n8n OpenAI node) |
+| D10 | หน้าที่ AI | ~~AI match Column ID~~ → **ไม่ใช้ AI** map ตรงจาก `SHEET_COLUMNS` (docs/19) |
+| D11 | AI model | ~~OpenAI~~ → **ไม่ใช้** — ไม่มี AI จึงไม่ต้อง scrub/restore ในเส้นทางนี้ |
 | D12 | restore ก่อนเขียนชีต | ✅ ต้อง restore — พนักงานเห็นข้อมูลจริง |
 | D13 | flow LINE ผ่าน AI ไหม | ❌ ไม่ผ่าน — follow/first_message ไม่มี free text |
 | D14 | deploy `services/pii` | **container แยก** จำลองให้เหมือน production |
@@ -74,7 +76,8 @@ LINE User ──> LIFF ──> Vercel ───────┘
 - [x] **S4 — n8n WF-A + internal event queue APIs** ✅
 - [x] **S5 — LIFF session + bootstrap + form_schemas** ✅ 145 tests ผ่าน
 - [x] **S6+S7 — หน้า LIFF + รับข้อมูลเข้าระบบ + merge** ✅ 159 tests ผ่าน
-- [ ] Phase 5 — Implementation (S8 → S11)
+- [x] **S8 — Google Sheets sync + WF-C** ✅ 175 tests ผ่าน
+- [ ] Phase 5 — Implementation (S9 → S11)
 - [ ] Phase 6 — Testing
 
 ## ขอบเขตงานนี้

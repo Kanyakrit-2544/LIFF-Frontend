@@ -82,6 +82,7 @@ function buildNewCustomer(customerId: string, input: ResolveCustomerInput): Cust
     sources: [sourceChannel],
     consent: null,
     profileRef: null,
+    pendingMerge: null,
     sheetSync: { dirty: true, rowKey: customerId, syncedAt: null, lockedAt: null, attempts: 0 },
     counters: { milestones: 0, formSubmits: 0 },
     firstInteractionAt,

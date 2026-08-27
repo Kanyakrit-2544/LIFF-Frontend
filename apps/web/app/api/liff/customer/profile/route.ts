@@ -1,5 +1,6 @@
 import {
   applyFormSubmission,
+  checkRateLimit,
   DEFAULT_FORM_ID,
   getPublishedSchema,
   getSchemaVersion,
@@ -19,6 +20,18 @@ export const maxDuration = 15;
  *
  * ⚠️ customerId มาจาก session เท่านั้น — ไม่รับจาก body ไม่ว่ากรณีใด
  */
+/** สรุปว่าแต่ละช่องมีค่าไหม/ยาวเท่าไร โดยไม่เอาค่าจริงออกมา */
+function summarizeAnswers(answers: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(answers)) {
+    if (v === undefined || v === null || v === "") out[k] = "ว่าง";
+    else if (typeof v === "boolean") out[k] = v ? "ติ๊ก" : "ไม่ติ๊ก";
+    else if (Array.isArray(v)) out[k] = `เลือก ${v.length} ข้อ`;
+    else out[k] = `กรอก ${String(v).length} ตัวอักษร`;
+  }
+  return out;
+}
+
 export async function POST(req: Request) {
   const requestId = newRequestId();
   const auth = await requireSession(requestId);
@@ -31,6 +44,10 @@ export async function POST(req: Request) {
     return fail("VALIDATION_FAILED", "body ไม่ใช่ JSON", requestId);
   }
 
+  // ปฏิเสธชนิดผิดตรง ๆ ดีกว่าเงียบ ๆ แล้วใช้ค่า default — ไม่งั้น client ส่งอะไรผิดก็ไม่รู้ตัว
+  if ("formId" in body && typeof body.formId !== "string") {
+    return fail("VALIDATION_FAILED", "formId ต้องเป็นข้อความ", requestId);
+  }
   const formId = typeof body.formId === "string" ? body.formId : DEFAULT_FORM_ID;
   const formVersion = typeof body.formVersion === "string" ? body.formVersion : null;
   const answers = body.answers && typeof body.answers === "object" ? (body.answers as Record<string, unknown>) : null;
@@ -42,6 +59,13 @@ export async function POST(req: Request) {
   if (!answers) return fail("VALIDATION_FAILED", "ต้องส่ง answers", requestId);
   if (!idempotencyKey) return fail("VALIDATION_FAILED", "ต้องส่ง idempotencyKey", requestId);
   if (!formVersion) return fail("VALIDATION_FAILED", "ต้องส่ง formVersion", requestId);
+
+  // docs/03 §3.13 — 5 ครั้ง/นาที/ลูกค้า
+  const rl = await checkRateLimit(`liff:profile:${auth.session.sub}`, 5, 60);
+  if (!rl.allowed) {
+    log.warn("ส่งฟอร์มถี่เกินกำหนด", { requestId, retryAfterSec: rl.retryAfterSec });
+    return fail("RATE_LIMITED", `ส่งข้อมูลถี่เกินไป กรุณารอ ${rl.retryAfterSec} วินาที`, requestId);
+  }
 
   try {
     const schema = await getSchemaVersion(formId, formVersion);
@@ -74,8 +98,17 @@ export async function POST(req: Request) {
       return fail("VALIDATION_FAILED", "ข้อมูลบางช่องไม่ถูกต้อง", requestId, result.issues);
     }
 
+    // log ว่ากรอกอะไรมาบ้าง — บันทึก "ชื่อช่อง + กรอกหรือไม่ + ยาวเท่าไร" ไม่ใช่ค่าจริง
+    // ค่าจริงเป็นข้อมูลส่วนบุคคล และ log บน Vercel ถูกส่งต่อ/ก็อปวางได้ง่าย (docs/06 §6.11)
     log.info("รับข้อมูลจากฟอร์ม LIFF", {
-      requestId, revision: result.revision, merged: result.merged, duplicate: result.duplicate,
+      requestId,
+      revision: result.revision,
+      duplicate: result.duplicate,
+      pendingMerge: Boolean(result.pendingMerge),
+      formVersion,
+      fields: summarizeAnswers(answers),
+      filled: Object.values(answers).filter((v) => v !== "" && v !== null && v !== undefined && v !== false).length,
+      total: Object.keys(answers).length,
     });
 
     if (!result.duplicate) {

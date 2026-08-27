@@ -67,6 +67,10 @@ export const INDEX_SPECS: Spec[] = [
     ],
   },
   {
+    collection: "rate_limits",
+    indexes: [{ key: { expiresAt: 1 }, name: "ttl_expiresAt", expireAfterSeconds: 0 }],
+  },
+  {
     collection: COLLECTIONS.formSchemas,
     indexes: [{ key: { formId: 1, status: 1 }, name: "ix_formStatus" }],
   },

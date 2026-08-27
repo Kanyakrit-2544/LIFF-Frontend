@@ -26,10 +26,12 @@ export async function GET() {
   const auth = await requireSession(requestId);
   if (!auth.ok) return auth.response;
 
-  const { sub: customerId } = auth.session;
+  const { sub } = auth.session;
 
   try {
     const db = await getDb();
+    // ถ้าเจ้าหน้าที่ merge บัญชีนี้ไปแล้ว ต้องตามไปหาตัวจริง ไม่งั้นผู้ใช้เห็นหน้าเปล่า
+    const customerId = await followMerge(db, sub);
     const [customer, schema, lastProfile] = await Promise.all([
       db.collection<CustomerDoc>(COLLECTIONS.customers).findOne({ _id: customerId }),
       getPublishedSchema(DEFAULT_FORM_ID),
@@ -84,6 +86,19 @@ export async function GET() {
 }
 
 /** ถอดรหัสไม่ได้ (เช่นหมุน key แล้วข้อมูลเก่าอ่านไม่ออก) ต้องไม่ทำให้ทั้งหน้าเปิดไม่ขึ้น */
+/** ตามสาย mergedInto ไปหาลูกค้าตัวจริง (สูงสุด 5 ชั้น กัน loop) */
+async function followMerge(db: Awaited<ReturnType<typeof getDb>>, id: string): Promise<string> {
+  let cur = id;
+  for (let i = 0; i < 5; i++) {
+    const doc = await db
+      .collection<CustomerDoc>(COLLECTIONS.customers)
+      .findOne({ _id: cur }, { projection: { status: 1, mergedInto: 1 } });
+    if (!doc || doc.status !== "merged" || !doc.mergedInto) return cur;
+    cur = doc.mergedInto;
+  }
+  return cur;
+}
+
 function safeDecrypt(enc: string | undefined | null, requestId: string): string {
   if (!enc) return "";
   try {

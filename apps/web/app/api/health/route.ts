@@ -1,4 +1,4 @@
-import { pingDb, queueStats, env, log } from "@line-crm/core";
+import { pingDb, queueStats, sheetSyncStats, env, log } from "@line-crm/core";
 import { newRequestId } from "@/lib/http";
 import { NextResponse } from "next/server";
 
@@ -14,11 +14,13 @@ export async function GET() {
   const db = await pingDb();
 
   let queue: Record<string, number> | null = null;
+  let sheets: Record<string, number> | null = null;
   if (db.ok) {
     try {
       queue = await queueStats();
+      sheets = await sheetSyncStats();
     } catch (e) {
-      log.warn("อ่าน queue stats ไม่ได้", { requestId, error: (e as Error).message });
+      log.warn("อ่าน stats ไม่ได้", { requestId, error: (e as Error).message });
     }
   }
 

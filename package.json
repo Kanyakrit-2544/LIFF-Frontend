@@ -19,7 +19,8 @@
     "smoke:line": "tsx --env-file=apps/web/.env.local scripts/smoke-line-webhook.ts",
     "smoke:s4": "tsx --env-file=apps/web/.env.local scripts/smoke-s4.ts",
     "seed:form": "tsx --env-file=apps/web/.env.local scripts/seed-form-schema.ts",
-    "env:vercel": "tsx scripts/make-vercel-env.ts"
+    "env:vercel": "tsx scripts/make-vercel-env.ts",
+    "setup:sheet": "tsx --env-file=apps/web/.env.local scripts/setup-sheet.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

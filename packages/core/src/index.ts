@@ -57,6 +57,9 @@ export type { FormSchemaDoc, FormSection, FormField, FieldType, FieldOption, Loc
 export { resolveCustomer, type ResolveCustomerInput, type ResolveCustomerResult } from "./identity/resolve";
 export { resolveLiffCustomer } from "./identity/resolveLiff";
 export { mergeCustomers, pickWinner, type MergeResult } from "./identity/merge";
+export { checkRateLimit, ensureRateLimitIndex, type RateLimitResult } from "./security/rateLimit";
 export { applyFormSubmission, type ApplyFormInput, type ApplyFormResult } from "./customers/applyFormSubmission";
+export { toSheetRow, SHEET_COLUMNS, SYSTEM_COLUMNS, HEADERS, COLUMN_IDS, columnLetter, systemRange, type SheetColumn } from "./customers/toSheetRow";
+export { claimDirtyCustomers, ackSheetSync, sheetSyncStats, type SheetPendingRow, type SheetAckItem } from "./customers/sheetQueue";
 export { upsertFromLine, type UpsertFromLineInput, type UpsertFromLineResult } from "./customers/upsertFromLine";
 export * from "./db/models";

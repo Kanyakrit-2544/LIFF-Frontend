@@ -1,10 +1,10 @@
 import { ObjectId } from "mongodb";
 import { getDb } from "../db/client";
-import { COLLECTIONS, type CustomerDoc, type CustomerProfileDoc, type InteractionDoc } from "../db/models";
+import { COLLECTIONS, type AuditLogDoc, type CustomerDoc, type CustomerProfileDoc, type InteractionDoc } from "../db/models";
 import { buildZodFromSchema, normalizeAnswers } from "../forms/buildZod";
 import type { FormSchemaDoc } from "../forms/types";
 import { packEmail, packPhone } from "../security/pii";
-import { mergeCustomers, pickWinner } from "../identity/merge";
+
 import { newProfileId } from "../ids";
 import { log } from "../logger";
 
@@ -29,8 +29,26 @@ export interface ApplyFormInput {
 }
 
 export type ApplyFormResult =
-  | { ok: true; customerId: string; revision: number; merged: boolean; duplicate: boolean }
+  | { ok: true; customerId: string; revision: number; merged: boolean; duplicate: boolean; pendingMerge?: boolean }
   | { ok: false; code: "VALIDATION_FAILED"; issues: Array<{ field: string; message: string }> };
+
+/** clientMeta มาจาก client ตรง ๆ ไม่ผ่าน schema — จำกัดขนาดกันยัดข้อมูลถ่วงฐาน */
+function capMeta(meta: Record<string, unknown> | undefined): Record<string, unknown> {
+  if (!meta) return {};
+  const out: Record<string, unknown> = {};
+  let budget = 2048;
+  for (const [k, v] of Object.entries(meta)) {
+    if (budget <= 0 || out.__truncated__) break;
+    if (k.length > 40) continue;
+    const s = typeof v === "string" ? v : JSON.stringify(v ?? null);
+    if (typeof s !== "string") continue;
+    const clipped = s.slice(0, Math.min(256, budget));
+    out[k] = clipped;
+    budget -= clipped.length;
+  }
+  if (JSON.stringify(meta).length > 2048) out.__truncated__ = true;
+  return out;
+}
 
 export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyFormResult> {
   const { schema } = input;
@@ -54,20 +72,28 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
   const phone = typeof answers.phone === "string" && answers.phone.startsWith("+") ? packPhone(answers.phone) : null;
   const email = typeof answers.email === "string" && answers.email.includes("@") ? packEmail(answers.email) : null;
 
-  let customerId = input.customerId;
-  let merged = false;
+  const customerId = input.customerId;
+  const merged = false;
+  let pendingMergeWith: string | null = null;
 
-  // ── 3. เบอร์ตรงกับลูกค้าคนอื่น → merge ──────────────────────
+  // ── 3. เบอร์ตรงกับลูกค้าคนอื่น → ตั้งธงให้คนตรวจ ไม่ merge เอง ──
+  //
+  // เดิมที่นี่ merge อัตโนมัติ (D3) แต่พบว่าเปิดช่องให้ยึดข้อมูลคนอื่นได้:
+  // เบอร์ที่พิมพ์ในฟอร์มเป็น "การอ้าง" ที่ยังไม่ได้ตรวจสอบ ใครก็พิมพ์เบอร์ของคนอื่นได้
+  // เมื่อ merge แล้ว ข้อมูลของอีกฝ่าย (อีเมล ชื่อเล่น ปีเกิด) จะถูกเติมเข้ามาในบัญชีผู้กรอก
+  // แล้วอ่านกลับออกไปได้ทาง /api/liff/bootstrap
+  //
+  // การรวมลูกค้ายังทำได้ แต่ต้องผ่านคนหรือผ่านการยืนยันเบอร์ (OTP) เท่านั้น
   if (phone) {
-    const other = await customers.findOne({ phoneHash: phone.hash, status: "active", _id: { $ne: customerId } });
+    const other = await customers.findOne(
+      { phoneHash: phone.hash, status: "active", _id: { $ne: customerId } },
+      { projection: { _id: 1 } }
+    );
     if (other) {
-      const self = await customers.findOne({ _id: customerId });
-      if (self) {
-        const { winner, loser } = await pickWinner(self, other);
-        await mergeCustomers(winner._id, loser._id, "phone_match", "liff:form_submit");
-        customerId = winner._id;
-        merged = true;
-      }
+      pendingMergeWith = other._id;
+      log.warn("เบอร์ซ้ำกับลูกค้าอีกคน — ตั้งธงรอตรวจสอบ ไม่ merge อัตโนมัติ", {
+        customerId, candidateId: other._id, reason: "phone_match",
+      });
     }
   }
 
@@ -85,7 +111,7 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
     answers,
     submittedVia: input.submittedVia ?? "liff",
     idempotencyKey: input.idempotencyKey,
-    clientMeta: input.clientMeta ?? {},
+    clientMeta: capMeta(input.clientMeta),
     createdAt: now,
   };
 
@@ -117,6 +143,10 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
   if (phone) { set.phone = phone; set.phoneHash = phone.hash; }
   if (email) { set.email = email; set.emailHash = email.hash; }
 
+  if (pendingMergeWith) {
+    set.pendingMerge = { candidateId: pendingMergeWith, reason: "phone_match", at: now };
+  }
+
   if (answers.consentDataProcessing === true) {
     set.consent = {
       dataProcessing: true,
@@ -146,5 +176,13 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
     if ((e as { code?: number }).code !== 11000) throw e;
   });
 
-  return { ok: true, customerId, revision, merged, duplicate: false };
+  if (pendingMergeWith) {
+    await db.collection<AuditLogDoc>(COLLECTIONS.auditLogs).insertOne({
+      _id: new ObjectId(), actor: input.submittedVia ?? "liff", action: "customer.merge_pending",
+      customerId, before: null, after: { candidateId: pendingMergeWith },
+      reason: "เบอร์ตรงกับลูกค้าอีกคน — รอเจ้าหน้าที่ตรวจสอบ", at: now,
+    });
+  }
+
+  return { ok: true, customerId, revision, merged, duplicate: false, pendingMerge: Boolean(pendingMergeWith) };
 }

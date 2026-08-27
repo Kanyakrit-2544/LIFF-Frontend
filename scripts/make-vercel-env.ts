@@ -64,9 +64,11 @@ for (const k of COPY) {
   if (!v) { missing.push(k); continue; }
   out[k] = v;
 }
-for (const k of ["LINE_LOGIN_SCOPES", "N8N_PUSH_ENABLED", "SHEETS_PII_MODE"]) out[k] = dev[k] ?? DEFAULTS[k]!;
+for (const k of ["LINE_LOGIN_SCOPES", "N8N_PUSH_ENABLED", "SHEETS_PII_MODE"]) out[k] = dev[k] || DEFAULTS[k]!;
 for (const [k, gen] of Object.entries(FRESH)) out[k] = keepSecrets ? (dev[k] ?? gen()) : gen();
 out.ALLOWED_LIFF_ORIGINS = `https://${domain}`;
+// n8n คุยกับ Sheets เอง Vercel ไม่ต้องมี — ใส่ไว้เผื่ออนาคตย้ายมาฝั่ง API
+for (const k of ["GOOGLE_SHEET_ID"]) if (dev[k]) out[k] = dev[k];
 
 const body = Object.entries(out).map(([k, v]) => `${k}=${v}`).join("\n") + "\n";
 fs.writeFileSync(OUT, body, { mode: 0o600 });

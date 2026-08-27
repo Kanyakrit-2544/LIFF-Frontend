@@ -89,7 +89,8 @@ async function cleanup() {
     db.collection(COLLECTIONS.customers).deleteMany({ lineDisplayName: `LINE ${runId}` }),
     ids.length ? db.collection(COLLECTIONS.customerProfiles).deleteMany({ customerId: { $in: ids } }) : Promise.resolve(),
     ids.length ? db.collection(COLLECTIONS.interactions).deleteMany({ customerId: { $in: ids } }) : Promise.resolve(),
-    db.collection(COLLECTIONS.auditLogs).deleteMany({ actor: "liff:form_submit" }),
+    db.collection(COLLECTIONS.auditLogs).deleteMany({ action: { $in: ["customer.merge", "customer.merge_pending"] } }),
+    db.collection("rate_limits").deleteMany({}),
   ]);
 }
 
@@ -174,26 +175,46 @@ describe.runIf(() => available)("POST /api/liff/customer/profile", () => {
     expect(res.status).toBe(404);
   });
 
-  it("⭐ เบอร์ตรงกับลูกค้าเดิม → merge ไม่สร้างข้อมูลซ้ำ", async () => {
+  it("⭐ เบอร์ตรงกับลูกค้าอีกคน → ไม่ merge อัตโนมัติ แต่ตั้งธงให้คนตรวจ", async () => {
+    // เบอร์ที่พิมพ์ในฟอร์มคือ "การอ้าง" ที่ยังไม่ได้ตรวจสอบ
+    // ถ้า merge เลย = ใครพิมพ์เบอร์คนอื่นก็ยึดข้อมูลเขาได้
     const db = await getDb();
-    const old = await makeCustomer();
+    const other = await makeCustomer();
     const p = packPhone(normalizePhone("0812345678")!);
-    await db.collection(COLLECTIONS.customers).updateOne({ _id: old } as never, {
-      $set: { phoneHash: p.hash, phone: p, displayName: "ลูกค้าเก่า", createdAt: new Date(Date.now() - 86400000) },
+    await db.collection(COLLECTIONS.customers).updateOne({ _id: other } as never, {
+      $set: { phoneHash: p.hash, phone: p, displayName: "ลูกค้าเก่า", nickname: "เก่า",
+              createdAt: new Date(Date.now() - 86400000) },
     });
 
     const j = await (await submit(req(answers()))).json();
-    expect(j.merged).toBe(true);
+    expect(j.merged).toBe(false);
+    expect(j.customerId).toBe(customerId);
 
-    const winner = await db.collection(COLLECTIONS.customers).findOne({ _id: j.customerId } as never);
-    expect(winner?.status).toBe("active");
-    const loserId = j.customerId === old ? customerId : old;
-    const loser = await db.collection(COLLECTIONS.customers).findOne({ _id: loserId } as never);
-    expect(loser?.status).toBe("merged");
-    expect(loser?.mergedInto).toBe(j.customerId);
+    // ทั้งสองบัญชียัง active ไม่มีใครถูกกลืน
+    const mine = await db.collection(COLLECTIONS.customers).findOne({ _id: customerId } as never);
+    const theirs = await db.collection(COLLECTIONS.customers).findOne({ _id: other } as never);
+    expect(mine?.status).toBe("active");
+    expect(theirs?.status).toBe("active");
+    expect(theirs?.mergedInto).toBeNull();
 
-    // audit ต้องบันทึกไว้ให้ย้อนดูได้
-    expect(await db.collection(COLLECTIONS.auditLogs).countDocuments({ action: "customer.merge" })).toBeGreaterThan(0);
+    // ข้อมูลของอีกฝ่ายต้องไม่ถูกดูดเข้ามา
+    expect(mine?.nickname).not.toBe("เก่า");
+
+    // ตั้งธงไว้ให้เจ้าหน้าที่ตัดสิน + มี audit
+    expect(mine?.pendingMerge?.candidateId).toBe(other);
+    expect(mine?.pendingMerge?.reason).toBe("phone_match");
+    expect(await db.collection(COLLECTIONS.auditLogs).countDocuments({ action: "customer.merge_pending" })).toBeGreaterThan(0);
+  });
+
+  it("⭐ ส่งถี่เกิน 5 ครั้ง/นาที → 429", async () => {
+    const res = await Promise.all(Array.from({ length: 9 }, (_, i) => submit(req(answers(), `rl-${runId}-${i}`))));
+    expect(res.filter((r) => r.status === 429).length).toBeGreaterThan(0);
+  });
+
+  it("clientMeta ขนาดใหญ่ถูกจำกัดก่อนเก็บ", async () => {
+    await submit(req({ ...answers(), clientMeta: { junk: "x".repeat(500_000) } }));
+    const pf = await (await getDb()).collection(COLLECTIONS.customerProfiles).findOne({ customerId });
+    expect(JSON.stringify(pf?.clientMeta ?? {}).length).toBeLessThan(3000);
   });
 
   it("สร้าง interaction form_submit", async () => {

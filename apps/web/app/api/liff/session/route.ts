@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import {
+  checkRateLimit,
   COLLECTIONS,
   createSession,
   env,
@@ -37,6 +38,13 @@ export async function POST(req: Request) {
 
   const idToken = typeof body.idToken === "string" ? body.idToken : "";
   if (!idToken) return fail("VALIDATION_FAILED", "ต้องส่ง idToken", requestId);
+
+  // กันคนยิง id_token มั่ว ๆ รัว ๆ เพื่อไล่เดา (แต่ละครั้งเราต้องยิงไปถาม LINE)
+  const ipKey = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = await checkRateLimit(`liff:session:${ipKey}`, 20, 60);
+  if (!rl.allowed) {
+    return fail("RATE_LIMITED", `เรียกถี่เกินไป กรุณารอ ${rl.retryAfterSec} วินาที`, requestId);
+  }
 
   const verified = await verifyLineIdToken(idToken);
   if (!verified.ok) {

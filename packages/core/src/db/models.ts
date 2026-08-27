@@ -63,12 +63,21 @@ export interface CustomerDoc {
 
   profileRef: { revision: number; formId: string; formVersion: string; updatedAt: Date } | null;
 
+  /**
+   * เบอร์/อีเมลที่กรอกมาตรงกับลูกค้าอีกคน แต่ยังไม่ยืนยันว่าเป็นคนเดียวกัน
+   * ไม่ merge อัตโนมัติ เพราะเบอร์ที่พิมพ์เองเป็นการอ้างที่ยังไม่ได้ตรวจสอบ
+   * ใครก็พิมพ์เบอร์ของคนอื่นได้ → merge อัตโนมัติ = ยึดบัญชีคนอื่นได้
+   */
+  pendingMerge: { candidateId: string; reason: string; at: Date } | null;
+
   sheetSync: {
     dirty: boolean;
     rowKey: string;
     syncedAt: Date | null;
     lockedAt: Date | null;
     attempts: number;
+    /** ตีตราตอนจองงาน — กัน worker สองตัวหยิบแถวเดียวกัน */
+    claimId?: string;
   };
 
   counters: { milestones: number; formSubmits: number };

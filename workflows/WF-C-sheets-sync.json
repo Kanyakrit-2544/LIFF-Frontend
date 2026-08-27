@@ -1,0 +1,428 @@
+{
+  "id": "wfc-sheets-sync",
+  "name": "WF-C — Google Sheets Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "cron",
+      "name": "Schedule (2 min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// เซ็น HMAC ให้ตรงกับ body ที่จะส่งจริง — n8n ต้องส่ง body เป็น raw ไม่ให้สร้าง JSON ใหม่\nconst crypto = require('crypto');\nconst payload = { limit: 200 };\nconst body = JSON.stringify(payload);\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type': 'application/json', 'x-signature': signature, 'x-timestamp': String(ts) } } }];"
+      },
+      "id": "sign-claim",
+      "name": "Sign Claim",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE}}/api/internal/sheets/pending",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{$json.headers['content-type']}}"
+            },
+            {
+              "name": "x-signature",
+              "value": "={{$json.headers['x-signature']}}"
+            },
+            {
+              "name": "x-timestamp",
+              "value": "={{$json.headers['x-timestamp']}}"
+            }
+          ]
+        }
+      },
+      "id": "claim-rows",
+      "name": "Claim Rows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.claimed }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-rows",
+      "name": "Has Rows?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// สร้าง JWT assertion สำหรับแลก access token ของ Google (service account flow)\nconst crypto = require('crypto');\nconst sa = JSON.parse($env.GOOGLE_SERVICE_ACCOUNT_JSON);\nconst b64 = (s) => Buffer.from(s).toString('base64url');\nconst now = Math.floor(Date.now() / 1000);\nconst header = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\nconst claim = b64(JSON.stringify({\n  iss: sa.client_email,\n  scope: 'https://www.googleapis.com/auth/spreadsheets',\n  aud: 'https://oauth2.googleapis.com/token',\n  iat: now, exp: now + 3600,\n}));\nconst sig = crypto.sign('RSA-SHA256', Buffer.from(`${header}.${claim}`), sa.private_key).toString('base64url');\nreturn [{ json: { assertion: `${header}.${claim}.${sig}`, rows: $('Claim Rows').first().json.rows, claimed: $('Claim Rows').first().json.claimed } }];"
+      },
+      "id": "google-token",
+      "name": "Google Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "urn:ietf:params:oauth:grant-type:jwt-bearer"
+            },
+            {
+              "name": "assertion",
+              "value": "={{$json.assertion}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-token",
+      "name": "Get Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{$env.GOOGLE_SHEET_ID}}/values/Customers!A2:A",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Get Token').first().json.access_token }}"
+            }
+          ]
+        }
+      },
+      "id": "read-keys",
+      "name": "Read Keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// จับคู่ customerId กับเลขแถวในชีต แล้ววางแผนว่าจะเขียนแถวไหนบ้าง\n// ใช้ values:batchUpdate ครั้งเดียวทั้งการแก้แถวเดิมและเพิ่มแถวใหม่\n// (append แยกจะเป็นอีก request และเสี่ยงชนกันเองถ้ามีสอง worker — แต่ claim lock กันไว้แล้ว)\nconst TAB = 'Customers';\nconst SYSTEM_COLS = Number($('Claim Rows').first().json.systemColumnCount);\nconst rows = $('Google Token').first().json.rows || [];\n\nconst letter = (i0) => { let n = i0 + 1, out = ''; while (n > 0) { const r = (n - 1) % 26; out = String.fromCharCode(65 + r) + out; n = Math.floor((n - 1) / 26); } return out; };\nconst lastCol = letter(SYSTEM_COLS - 1);\n\nconst keys = ($('Read Keys').first().json.values || []).map((r) => (r && r[0]) || '');\nconst rowOf = new Map();\nkeys.forEach((k, i) => { if (k) rowOf.set(k, i + 2); });   // แถว 1 เป็นหัวตาราง\nlet nextRow = keys.length + 2;\n\nconst data = [];\nconst ids = [];\nfor (const r of rows) {\n  const idx = rowOf.has(r.rowKey) ? rowOf.get(r.rowKey) : nextRow++;\n  data.push({ range: `${TAB}!A${idx}:${lastCol}${idx}`, values: [r.values] });\n  ids.push(r.customerId);\n}\nreturn [{ json: { data, ids, count: data.length } }];"
+      },
+      "id": "plan-writes",
+      "name": "Plan Writes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{$env.GOOGLE_SHEET_ID}}/values:batchUpdate",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ valueInputOption: 'RAW', data: $json.data }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Get Token').first().json.access_token }}"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "write-rows",
+      "name": "Write Rows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// batchUpdate สำเร็จทั้งก้อนหรือล้มทั้งก้อน — ไม่มีสถานะรายแถว\nconst upd = $('Write Rows').first().json;\nconst ids = $('Plan Writes').first().json.ids || [];\nconst okCount = Number(upd?.totalUpdatedRows ?? upd?.responses?.length ?? 0);\nconst ok = okCount > 0 || ids.length === 0;\nconst results = ids.map((customerId) => ({ customerId, status: ok ? 'ok' : 'error', error: ok ? undefined : 'batchUpdate ไม่สำเร็จ' }));\n\nconst crypto = require('crypto');\nconst body = JSON.stringify({ results });\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type': 'application/json', 'x-signature': signature, 'x-timestamp': String(ts) } } }];"
+      },
+      "id": "collect-+-sign-ack",
+      "name": "Collect + Sign Ack",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE}}/api/internal/sheets/ack",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "neverError": false
+            }
+          }
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{$json.headers['content-type']}}"
+            },
+            {
+              "name": "x-signature",
+              "value": "={{$json.headers['x-signature']}}"
+            },
+            {
+              "name": "x-timestamp",
+              "value": "={{$json.headers['x-timestamp']}}"
+            }
+          ]
+        }
+      },
+      "id": "ack-sync",
+      "name": "Ack Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Schedule (2 min)": {
+      "main": [
+        [
+          {
+            "node": "Sign Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign Claim": {
+      "main": [
+        [
+          {
+            "node": "Claim Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Rows": {
+      "main": [
+        [
+          {
+            "node": "Has Rows?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Rows?": {
+      "main": [
+        [
+          {
+            "node": "Google Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Google Token": {
+      "main": [
+        [
+          {
+            "node": "Get Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Token": {
+      "main": [
+        [
+          {
+            "node": "Read Keys",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Keys": {
+      "main": [
+        [
+          {
+            "node": "Plan Writes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Writes": {
+      "main": [
+        [
+          {
+            "node": "Write Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Rows": {
+      "main": [
+        [
+          {
+            "node": "Collect + Sign Ack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect + Sign Ack": {
+      "main": [
+        [
+          {
+            "node": "Ack Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "errorWorkflow": "wfe-error-handler"
+  },
+  "active": false,
+  "versionId": "1",
+  "meta": {}
+}
