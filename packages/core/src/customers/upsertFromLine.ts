@@ -120,13 +120,6 @@ async function updateLineCustomer(input: {
     }
   );
 
-  // เติมชื่อให้เฉพาะตอนที่ยังว่าง (fill-forward) — ไม่ทับของเดิม
-  if (input.profile.displayName) {
-    await (await getDb()).collection<CustomerDoc>(COLLECTIONS.customers).updateOne(
-      { _id: input.customerId, $or: [{ displayName: { $exists: false } }, { displayName: null }, { displayName: "" }] },
-      { $set: { displayName: input.profile.displayName, updatedAt: input.now, "sheetSync.dirty": true, "aiSync.dirty": true } }
-    );
-  }
 
   if (input.eventType === "follow") {
     await (await getDb()).collection<CustomerDoc>(COLLECTIONS.customers).updateOne(

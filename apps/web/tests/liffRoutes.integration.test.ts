@@ -142,7 +142,7 @@ describe.runIf(runIntegration)("POST /api/liff/session", () => {
     expect(await db.collection(COLLECTIONS.identities).countDocuments({ externalId: LINE_USER })).toBe(1);
   });
 
-  it("ชื่อจริงที่ลูกค้าเคยกรอกไม่ถูกทับด้วยชื่อ LINE", async () => {
+  it("ชื่อจริงที่ลูกค้าเคยกรอกไม่ถูกทับด้วยชื่อ LINE (regression docs/12)", async () => {
     stubLineVerify(idTokenPayload());
     const j = await (await sessionPost(req({ idToken: "tok" }))).json();
     const db = await getDb();
@@ -192,11 +192,15 @@ describe.runIf(runIntegration)("GET /api/liff/bootstrap", () => {
     expect(j.consentRequired).toBe(true);
   });
 
-  it("prefill เติมชื่อจาก LINE ให้อัตโนมัติ", async () => {
+  it("⭐ ช่องชื่อ-นามสกุลต้องว่าง ไม่ใช่ชื่อ LINE", async () => {
+    // ชื่อใน LINE มักเป็นชื่อเล่น/ชื่ออังกฤษ ไม่ใช่ชื่อจริง
+    // ถ้า prefill ให้ ลูกค้าจะกดส่งทับไปเลยแล้วได้ชื่อผิดทั้งฐาน
     stubLineVerify(idTokenPayload());
     await sessionPost(req({ idToken: "tok" }));
     const j = await (await bootstrapGet()).json();
-    expect(j.prefill.fullNameTh).toBe("LINE ชื่อเล่น");
+    expect(j.prefill.fullNameTh).toBe("");
+    // แต่ชื่อ LINE ยังเก็บไว้แยกต่างหาก
+    expect(j.profile.lineDisplayName).toBe("LINE ชื่อเล่น");
   });
 
   it("⭐ ไม่คืน field ภายในหรือ LINE user id ออกไป", async () => {

@@ -60,17 +60,13 @@ export async function POST(req: Request) {
     const resolved = await resolveLiffCustomer(sub);
     const customers = (await getDb()).collection<CustomerDoc>(COLLECTIONS.customers);
 
-    // เก็บโปรไฟล์ล่าสุดจาก LINE — displayName เติมเฉพาะตอนว่าง ไม่ทับชื่อจริงที่ลูกค้ากรอกเอง (docs/12 บั๊ก A)
+    // เก็บเฉพาะกระจกของ LINE — ห้ามแตะ displayName
+    // displayName คือ "ชื่อ-นามสกุลจริง" ที่ลูกค้ากรอกเอง ถ้าเติมชื่อ LINE ให้
+    // ช่องในฟอร์มจะมีชื่อเล่น LINE อยู่แล้วตั้งแต่เปิดครั้งแรก ลูกค้าก็กดส่งทับไปเลย
     const set: Record<string, unknown> = { updatedAt: new Date() };
     if (name) set.lineDisplayName = name;
     if (picture) set.pictureUrl = picture;
     if (Object.keys(set).length > 1) await customers.updateOne({ _id: resolved.customerId }, { $set: set });
-    if (name) {
-      await customers.updateOne(
-        { _id: resolved.customerId, $or: [{ displayName: { $exists: false } }, { displayName: null }, { displayName: "" }] },
-        { $set: { displayName: name } }
-      );
-    }
 
     const doc = await customers.findOne(
       { _id: resolved.customerId },

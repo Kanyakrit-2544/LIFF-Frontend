@@ -262,7 +262,7 @@ describe.runIf(runIntegration)("ชื่อลูกค้าต้องไม
     const doc = await col.findOne({ _id: ids!.customerId });
     expect(doc?.lineDisplayName).toBe("ชื่อที่เพิ่งดึงได้");
     expect(doc?.pictureUrl).toBe("https://x/new.jpg");
-    // ยังว่างอยู่ → เติมให้ได้
-    expect(doc?.displayName).toBe("ชื่อที่เพิ่งดึงได้");
+    // displayName คือชื่อจริงที่ลูกค้ากรอกเอง — ระบบต้องไม่เติมชื่อ LINE ให้
+    expect(doc?.displayName).toBeNull();
   });
 });
