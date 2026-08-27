@@ -274,6 +274,14 @@ export default function LiffApp({ liffId, allowPreview = false }: { liffId: stri
         );
       })}
 
+      <p className="subtitle" style={{ marginTop: -8 }}>
+        การกดบันทึกถือว่าคุณได้อ่าน{" "}
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>
+          นโยบายความเป็นส่วนตัว
+        </a>{" "}
+        แล้ว
+      </p>
+
       {formError && <div className="form-error">{formError}</div>}
       <button className="submit" onClick={() => void submit()} disabled={saving}>
         {saving ? "กำลังบันทึก…" : (formSchema.submitLabel?.th ?? "บันทึกข้อมูล")}
