@@ -102,7 +102,8 @@ export default function LiffApp({ liffId, allowPreview = false }: { liffId: stri
           liff.login({ redirectUri: window.location.href });
           return;
         }
-        setPhase({ s: "error", text: j?.error?.message ?? "เข้าสู่ระบบไม่สำเร็จ", retry: true });
+        const cause = j?.error?.details?.cause;
+        setPhase({ s: "error", text: (j?.error?.message ?? "เข้าสู่ระบบไม่สำเร็จ") + (cause ? `\n(${cause})` : ""), retry: true });
         return;
       }
       const sjson = await sres.json();

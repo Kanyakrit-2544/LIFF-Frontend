@@ -6,6 +6,7 @@ import {
   env,
   getDb,
   log,
+  redact,
   resolveLiffCustomer,
   SESSION_COOKIE,
   sessionCookieOptions,
@@ -95,7 +96,12 @@ export async function POST(req: Request) {
       requestId
     );
   } catch (e) {
-    log.error("สร้าง session ไม่สำเร็จ", { requestId, error: (e as Error).message });
-    return fail("INTERNAL_ERROR", "เข้าสู่ระบบไม่สำเร็จ", requestId);
+    const msg = (e as Error).message ?? "";
+    log.error("สร้าง session ไม่สำเร็จ", { requestId, error: msg });
+    // ส่งสาเหตุแบบย่อกลับไปด้วย เพื่อให้ดีบักได้โดยไม่ต้องพึ่ง log ของ Vercel
+    // ตัดเหลือ 160 ตัวและผ่าน redact แล้ว — ไม่มี PII และไม่มี stack trace
+    return fail("INTERNAL_ERROR", "เข้าสู่ระบบไม่สำเร็จ", requestId, {
+      cause: String(redact(msg)).slice(0, 160),
+    });
   }
 }
