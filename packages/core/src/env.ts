@@ -51,6 +51,13 @@ const n8nSchema = z.object({
 
 const optionalText = z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional());
 
+const partnerSchema = z.object({
+  /** JSON object: { "partner-id": "partner-specific-hmac-secret" } */
+  PARTNER_HMAC_SECRETS_JSON: optionalText,
+  /** LINE Messaging channel used when a partner supplies a previously unseen lineUserId. */
+  PARTNER_LINE_CHANNEL_ID: optionalText,
+});
+
 const llmSchema = z.object({
   LLM_BASE_URL: optionalText.pipe(z.string().url().optional()),
   LLM_API_KEY: optionalText,
@@ -70,6 +77,7 @@ const groups = {
   security: securitySchema,
   n8n: n8nSchema,
   llm: llmSchema,
+  partner: partnerSchema,
 } as const;
 
 type Groups = typeof groups;

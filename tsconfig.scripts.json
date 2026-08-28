@@ -4,5 +4,11 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["scripts/scrub-legacy.ts", "scripts/build-matches.ts"]
+  "include": [
+    "scripts/scrub-legacy.ts",
+    "scripts/build-matches.ts",
+    "scripts/scrub-partner.ts",
+    "scripts/reconcile-partner.ts",
+    "scripts/smoke-partner.ts"
+  ]
 }

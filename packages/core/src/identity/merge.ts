@@ -2,6 +2,8 @@ import { ObjectId } from "mongodb";
 import { getClient, getDb } from "../db/client";
 import { COLLECTIONS, type AuditLogDoc, type CustomerDoc } from "../db/models";
 import { log } from "../logger";
+import { recomputeIntentCurrent } from "../partner/intents";
+import type { CustomerIntentDoc } from "../partner/models";
 
 /**
  * รวมลูกค้าสองคนเป็นคนเดียว (docs/02 §2.5)
@@ -16,7 +18,7 @@ import { log } from "../logger";
 export interface MergeResult {
   winnerId: string;
   loserId: string;
-  moved: { identities: number; profiles: number; interactions: number };
+  moved: { identities: number; profiles: number; interactions: number; purchases: number; purchaseItems: number; intents: number };
 }
 
 /** เลือกว่าใครเป็นตัวหลัก: มี identity ยืนยันแล้วมากกว่า → เก่ากว่า → ข้อมูลครบกว่า */
@@ -52,17 +54,39 @@ export async function mergeCustomers(winnerId: string, loserId: string, reason: 
   const [winner, loser] = await Promise.all([customers.findOne({ _id: winnerId }), customers.findOne({ _id: loserId })]);
   if (!winner || !loser) throw new Error("merge: ไม่พบลูกค้าที่จะรวม");
 
-  const moved = { identities: 0, profiles: 0, interactions: 0 };
+  const moved = { identities: 0, profiles: 0, interactions: 0, purchases: 0, purchaseItems: 0, intents: 0 };
   const session = client.startSession();
 
   try {
     await session.withTransaction(async () => {
-      const r1 = await db.collection(COLLECTIONS.identities).updateMany({ customerId: loserId }, { $set: { customerId: winnerId, updatedAt: new Date() } }, { session });
+      const now = new Date();
+      const loserIntents = await db.collection<CustomerIntentDoc>(COLLECTIONS.customerIntents)
+        .find({ customerId: loserId }, { projection: { courseCode: 1 }, session }).toArray();
+      const r1 = await db.collection(COLLECTIONS.identities).updateMany({ customerId: loserId }, { $set: { customerId: winnerId, updatedAt: now } }, { session });
       const r2 = await db.collection(COLLECTIONS.customerProfiles).updateMany({ customerId: loserId }, { $set: { customerId: winnerId } }, { session });
       const r3 = await db.collection(COLLECTIONS.interactions).updateMany({ customerId: loserId }, { $set: { customerId: winnerId } }, { session });
+      const r4 = await db.collection(COLLECTIONS.purchases).updateMany(
+        { customerId: loserId },
+        { $set: { customerId: winnerId, updatedAt: now, "aiSync.dirty": true, "aiSync.lockedAt": null } },
+        { session }
+      );
+      const r5 = await db.collection(COLLECTIONS.purchaseItems).updateMany({ customerId: loserId }, { $set: { customerId: winnerId } }, { session });
+      const r6 = await db.collection(COLLECTIONS.customerIntents).updateMany(
+        { customerId: loserId },
+        { $set: { customerId: winnerId, updatedAt: now, "aiSync.dirty": true, "aiSync.lockedAt": null } },
+        { session }
+      );
+      await db.collection(COLLECTIONS.partnerEvents).updateMany({ customerId: loserId }, { $set: { customerId: winnerId } }, { session });
       moved.identities = r1.modifiedCount;
       moved.profiles = r2.modifiedCount;
       moved.interactions = r3.modifiedCount;
+      moved.purchases = r4.modifiedCount;
+      moved.purchaseItems = r5.modifiedCount;
+      moved.intents = r6.modifiedCount;
+
+      for (const courseCode of new Set(loserIntents.map((intent) => intent.courseCode))) {
+        await recomputeIntentCurrent(db, winnerId, courseCode, now, session);
+      }
 
       // เติม field ที่ winner ยังว่างจาก loser — ไม่ทับของที่มีอยู่แล้ว
       const fill: Record<string, unknown> = {};
@@ -75,7 +99,7 @@ export async function mergeCustomers(winnerId: string, loserId: string, reason: 
       await customers.updateOne(
         { _id: winnerId },
         {
-          $set: { ...fill, "sheetSync.dirty": true, "aiSync.dirty": true, updatedAt: new Date() },
+          $set: { ...fill, "sheetSync.dirty": true, "aiSync.dirty": true, updatedAt: now },
           ...(loser.firstInteractionAt ? { $min: { firstInteractionAt: loser.firstInteractionAt } } : {}),
           ...(loser.lastInteractionAt ? { $max: { lastInteractionAt: loser.lastInteractionAt } } : {}),
           $addToSet: { sources: { $each: loser.sources ?? [] }, tags: { $each: loser.tags ?? [] } },
@@ -86,7 +110,7 @@ export async function mergeCustomers(winnerId: string, loserId: string, reason: 
 
       await customers.updateOne(
         { _id: loserId },
-        { $set: { status: "merged", mergedInto: winnerId, "sheetSync.dirty": true, "aiSync.dirty": true, updatedAt: new Date() } },
+        { $set: { status: "merged", mergedInto: winnerId, "sheetSync.dirty": true, "aiSync.dirty": true, updatedAt: now } },
         { session }
       );
 
@@ -94,7 +118,7 @@ export async function mergeCustomers(winnerId: string, loserId: string, reason: 
         _id: new ObjectId(), actor, action: "customer.merge", customerId: winnerId,
         before: { loserId, loserSources: loser.sources ?? [] },
         after: { winnerId, moved },
-        reason, at: new Date(),
+        reason, at: now,
       };
       await db.collection<AuditLogDoc>(COLLECTIONS.auditLogs).insertOne(audit, { session });
     });

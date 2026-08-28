@@ -26,6 +26,14 @@ export {
   type ScrubbedLegacyPayment,
   type ScrubbedLegacyEnrollment,
 } from "./ai/scrubLegacy";
+export {
+  scrubPurchase,
+  scrubPurchaseItem,
+  scrubCustomerIntent,
+  type ScrubbedPurchase,
+  type ScrubbedPurchaseItem,
+  type ScrubbedCustomerIntent,
+} from "./ai/scrubPartner";
 export { ensureAiIndexes, verifyAiIndexes, aiIndexMatchesSpec, AI_INDEX_SPECS, type AiIndexSpec } from "./ai/indexes";
 export {
   claimLegacyAiSync,
@@ -92,4 +100,10 @@ export { claimDirtyCustomers, ackSheetSync, sheetSyncStats, type SheetPendingRow
 export { upsertFromLine, type UpsertFromLineInput, type UpsertFromLineResult } from "./customers/upsertFromLine";
 export { scrubCustomer, type ScrubbedCustomer } from "./ai/scrubCustomer";
 export { claimAiMirrorCustomers, ackAiMirror, aiMirrorStats, type AiMirrorPendingRow, type AiMirrorAckItem } from "./ai/aiMirror";
+export { partnerSecretFor, partnerLineChannelId } from "./partner/auth";
+export { parsePartnerEvent, type ParsedPartnerEvent, type PartnerParseResult } from "./partner/schema";
+export { intakePartnerEvents, type PartnerIntakeReport } from "./partner/intake";
+export { reconcilePartnerIdentities, type PartnerReconcileReport } from "./partner/reconcile";
+export { recomputeIntentCurrent, currentIntent, intentRejectionReason } from "./partner/intents";
+export * from "./partner/models";
 export * from "./db/models";

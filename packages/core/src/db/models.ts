@@ -9,6 +9,11 @@ export const COLLECTIONS = {
   interactions: "interactions",
   inboundEvents: "inbound_events",
   auditLogs: "audit_logs",
+  partnerEvents: "partner_events",
+  purchases: "purchases",
+  purchaseItems: "purchase_items",
+  customerIntents: "customer_intents",
+  partnerQuarantine: "partner_quarantine",
 } as const;
 
 export const AI_COLLECTIONS = {
@@ -17,6 +22,9 @@ export const AI_COLLECTIONS = {
   legacyPaymentsScrubbed: "legacy_payments_scrubbed",
   legacyEnrollmentsScrubbed: "legacy_enrollments_scrubbed",
   customerLinks: "customer_links",
+  purchasesScrubbed: "purchases_scrubbed",
+  purchaseItemsScrubbed: "purchase_items_scrubbed",
+  customerIntentsScrubbed: "customer_intents_scrubbed",
 } as const;
 
 export type IdentityProvider =

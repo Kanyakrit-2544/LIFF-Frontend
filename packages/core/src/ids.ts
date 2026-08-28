@@ -20,6 +20,11 @@ const PREFIX = {
   legacyPayment: "lgy",
   legacyEnrollment: "lge",
   link: "lnk",
+  partnerEvent: "pev",
+  purchase: "pur",
+  purchaseItem: "pit",
+  intent: "int",
+  quarantine: "pqu",
 } as const;
 
 export type IdKind = keyof typeof PREFIX;

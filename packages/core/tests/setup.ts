@@ -3,5 +3,12 @@ process.env.AI_HASH_PEPPER = "test-ai-hash-pepper-must-be-at-least-32-chars";
 process.env.INTERNAL_HMAC_SECRET = "test-internal-hmac-secret-at-least-32-chars";
 process.env.SESSION_JWT_SECRET = "test-session-jwt-secret-at-least-32-chars!";
 process.env.ALLOWED_LIFF_ORIGINS = "http://localhost:3000";
+process.env.PARTNER_HMAC_SECRETS_JSON = JSON.stringify({
+  tagger: "test-partner-hmac-secret-must-be-at-least-32-chars",
+});
+process.env.LINE_CHANNEL_SECRET = "test-line-channel-secret";
+process.env.LINE_CHANNEL_ACCESS_TOKEN = "test-line-token";
+process.env.LINE_CHANNEL_ID = "2000000001";
+process.env.LINE_LOGIN_CHANNEL_ID = "2000000002";
 process.env.MONGODB_URI ??= "mongodb://localhost:27018/?directConnection=true"; // npm run db:test:up
 process.env.MONGODB_DB ??= "line_crm_test";

@@ -32,6 +32,20 @@ export const AI_INDEX_SPECS: Record<string, AiIndexSpec[]> = {
     { name: "ix_legacy", key: { legacyPersonId: 1 } },
     { name: "ix_status", key: { status: 1, confidence: 1 } },
   ],
+  [AI_COLLECTIONS.purchasesScrubbed]: [
+    { name: "ix_customer", key: { customerId: 1 }, sparse: true },
+    { name: "ix_yearMonth", key: { year: 1, month: 1 } },
+    { name: "ix_statusPaidAt", key: { status: 1, paidAt: 1 } },
+  ],
+  [AI_COLLECTIONS.purchaseItemsScrubbed]: [
+    { name: "ix_purchase", key: { purchaseId: 1 } },
+    { name: "ix_customer", key: { customerId: 1 }, sparse: true },
+    { name: "ix_courseSession", key: { courseCode: 1, sessionStart: 1, countsAsSeat: 1 } },
+  ],
+  [AI_COLLECTIONS.customerIntentsScrubbed]: [
+    { name: "ix_current", key: { customerId: 1, courseCode: 1, supersededAt: 1 }, sparse: true },
+    { name: "ix_funnel", key: { status: 1, hesitationReason: 1, observedAt: 1 } },
+  ],
 };
 
 export function aiIndexMatchesSpec(

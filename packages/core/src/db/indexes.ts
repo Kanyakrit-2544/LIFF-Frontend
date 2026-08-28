@@ -75,6 +75,47 @@ export const INDEX_SPECS: Spec[] = [
       { key: { action: 1, at: -1 }, name: "ix_actionAt" },
     ],
   },
+  {
+    collection: COLLECTIONS.partnerEvents,
+    indexes: [
+      { key: { partnerId: 1, eventId: 1 }, name: "ux_partnerEvent", unique: true },
+      { key: { status: 1, receivedAt: -1 }, name: "ix_statusReceived" },
+    ],
+  },
+  {
+    collection: COLLECTIONS.purchases,
+    indexes: [
+      { key: { customerId: 1 }, name: "ix_customer" },
+      { key: { paidAt: 1 }, name: "ix_paidAt" },
+      { key: { year: 1, month: 1 }, name: "ix_yearMonth" },
+      { key: { "aiSync.dirty": 1, "aiSync.lockedAt": 1 }, name: "ix_aiSyncQueue" },
+      { key: { partnerId: 1, sourceEventId: 1 }, name: "ux_sourceEvent", unique: true },
+    ],
+  },
+  {
+    collection: COLLECTIONS.purchaseItems,
+    indexes: [
+      { key: { purchaseId: 1 }, name: "ix_purchase" },
+      { key: { courseCode: 1, sessionStart: 1, countsAsSeat: 1 }, name: "ix_courseSession" },
+    ],
+  },
+  {
+    collection: COLLECTIONS.customerIntents,
+    indexes: [
+      { key: { customerId: 1, courseCode: 1, supersededAt: 1 }, name: "ix_current" },
+      { key: { observedAt: 1 }, name: "ix_observed" },
+      { key: { status: 1, hesitationReason: 1, observedAt: 1 }, name: "ix_funnel" },
+      { key: { "aiSync.dirty": 1, "aiSync.lockedAt": 1 }, name: "ix_aiSyncQueue" },
+      { key: { partnerId: 1, sourceEventId: 1 }, name: "ux_sourceEvent", unique: true },
+    ],
+  },
+  {
+    collection: COLLECTIONS.partnerQuarantine,
+    indexes: [
+      { key: { partnerId: 1, eventId: 1 }, name: "ux_partnerEvent", unique: true },
+      { key: { updatedAt: -1 }, name: "ix_updatedAt" },
+    ],
+  },
 ];
 
 /**

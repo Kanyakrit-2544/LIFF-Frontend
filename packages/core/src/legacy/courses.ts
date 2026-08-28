@@ -25,7 +25,7 @@ export const COURSES: CourseDef[] = [
   { code: "TTRT", nameTh: "The Trainer", aliases: ["ttrt", "ttrt'63", "ttrt'64", "the trainer"] },
   { code: "DEEPIN", nameTh: "Deep In", aliases: ["deep in", "deepin"] },
   { code: "INNERCAMP", nameTh: "Inner Camp", aliases: ["inner camp"] },
-  { code: "OTHER", nameTh: "อื่น ๆ", aliases: ["อื่น ๆ", "อื่นๆ"], nonCourse: true },
+  { code: "OTHER", nameTh: "อื่น ๆ", aliases: ["อื่น ๆ", "อื่นๆ", "สินค้า", "หนังสือ", "ห้องพัก"], nonCourse: true },
 ];
 
 const BY_ALIAS = new Map<string, CourseDef>();

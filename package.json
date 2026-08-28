@@ -29,7 +29,10 @@
     "legacy:profile": "python3 scripts/legacy/profile_xlsx.py \"raw input/Inner.xlsx\" Inner2025 Inner2026",
     "legacy:generate": "tsx --env-file=apps/web/.env.local scripts/generate-legacy-mock.ts",
     "legacy:scrub": "tsx --env-file=apps/web/.env.local scripts/scrub-legacy.ts",
-    "match:build": "tsx --env-file=apps/web/.env.local scripts/build-matches.ts"
+    "match:build": "tsx --env-file=apps/web/.env.local scripts/build-matches.ts",
+    "partner:scrub": "tsx --env-file=apps/web/.env.local scripts/scrub-partner.ts",
+    "partner:reconcile": "tsx --env-file=apps/web/.env.local scripts/reconcile-partner.ts",
+    "smoke:partner": "tsx --env-file=apps/web/.env.local scripts/smoke-partner.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

@@ -53,6 +53,11 @@ const SLIP_RE = /\b(IN-\d{4}-\d{5})\b/i;
 /** รอบเรียนที่ "ขายได้จริง" — relearn/free เป็นสิทธิ์ ไม่ใช่ยอดขายใหม่ */
 const SEAT_KINDS = new Set<EnrollmentKind>(["enrolled"]);
 
+/** Structured intake uses the same seat rule as legacy cell parsing. */
+export function enrollmentCountsAsSeat(kind: EnrollmentKind): boolean {
+  return SEAT_KINDS.has(kind);
+}
+
 function parseSession(label: string, sheetYear: number): Pick<ParsedCourseCell, "sessionLabel" | "sessionYear" | "sessionStart" | "sessionPrecision"> {
   const cleaned = label.replace(/\s+/g, " ").trim();
   if (!cleaned) return { sessionLabel: null, sessionYear: null, sessionStart: null, sessionPrecision: "none" };
