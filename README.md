@@ -44,6 +44,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 26 | [S11-M3.5 — สัญญาเชื่อมต่อระบบติด Tag](docs/26-purchase-intake-contract.md) | **§A ข้อกำหนดให้ระบบ tag · §B สเปกฝั่งรับ** |
 | 27 | [S11-M3.5 — Implementation Report](docs/27-s11-m35-report.md) | ผลรันจริง + ผลรีวิว (ทดสอบด้วย payload ที่จงใจโกหก) |
 | 28 | [S11-M6 — Facebook Lead Ads](docs/28-s11-m6-facebook-lead.md) | webhook, attribution, consent, ผลรันจริง |
+| 29 | [S11-M4 — สเปก Analytics + insights](docs/29-s11-m4-analytics.md) | สูตรที่ถูกต้อง, ขอบเขตของ LLM, ตัวกันโกหก |
 | 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรัน match engine, fixture 25, privacy tests และข้อจำกัด LLM |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
@@ -73,6 +74,11 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | D20 | ข้อความต้อนรับตอน follow | **ยังไม่ส่ง** — รอ S6 ที่มีปุ่มเปิดฟอร์ม LIFF |
 | D21 | ปลายทาง alert เวลาระบบพัง | **เก็บ log ในระบบ** ยังไม่ต่อช่องทางภายนอก |
 | D22 | ค่าของ `channelId` | ใช้ `destination` จาก LINE webhook body |
+| D36 | ใครเป็นคนบอกตัวเลข | **aggregation ใน core เท่านั้น** LLM แปลงคำถาม + เขียนสรุปจากตัวเลขที่ได้มาแล้ว |
+| D37 | ข้อมูล synthetic ในรายงาน | ไม่โผล่โดยไม่ได้ขอ (`includeSynthetic: false` เป็นค่าเริ่มต้น) |
+| D38 | เขตเวลาของรายงาน | ตัดวัน/สัปดาห์/เดือนตาม **Asia/Bangkok** เสมอ |
+| D39 | ตัวเลขจาก intent | เป็น**ค่าประเมิน** ห้ามปนกับยอดขายโดยไม่กำกับป้าย |
+| D40 | ตรวจย้อนหลัง | เก็บ params + result ลง `insights` รันซ้ำต้องได้ผลเดิม |
 | D31 | webhook ของ Facebook เก็บอะไร | **เก็บแค่ id** — Meta ไม่ส่งข้อมูลลูกค้ามากับ webhook จึงไม่มี PII ใน `inbound_events` |
 | D32 | ไม่มี env ของ Facebook | route ตอบ **404** เหมือนไม่มีอยู่ · ระบบส่วนอื่นทำงานปกติ |
 | D33 | consent จากฟอร์มโฆษณา | **ห้ามสมมติว่ายินยอม** ไม่มีคำถาม consent = ไม่มี consent |
