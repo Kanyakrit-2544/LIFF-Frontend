@@ -39,6 +39,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 21 | [S11 — ฐาน legacy (mock) + จับคู่ด้วย AI](docs/21-legacy-mock-and-ai-matching.md) | ข้อมูล synthetic จากสถิติชีตขาย, โครง persons/payments/enrollments, กติกาให้ LLM |
 | 22 | [S11-M2 — สเปก scrub legacy](docs/22-s11-m2-spec.md) | scrub deterministic เข้า AI DB, queue, index, verify |
 | 23 | [S11-M2 — Implementation Report](docs/23-s11-m2-report.md) | ผลรันจริง: scrub/verify/idempotency + hash parity |
+| 24 | [S11-M3 — สเปก Match Engine](docs/24-s11-m3-spec.md) | จับคู่ลูกค้า LINE ↔ ประวัติซื้อ, กติกา hash, ขอบเขตที่ LLM เห็นได้ |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
 ## Design Decisions (ยืนยันแล้ว)
