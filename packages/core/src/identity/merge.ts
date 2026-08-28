@@ -38,7 +38,7 @@ export async function pickWinner(a: CustomerDoc, b: CustomerDoc): Promise<{ winn
 }
 
 const FILL_FORWARD: (keyof CustomerDoc)[] = [
-  "displayName", "nickname", "fullNameEn", "birthYear", "lineDisplayName",
+  "title", "heardFrom", "displayName", "nickname", "fullNameEn", "birthYear", "lineDisplayName",
   "pictureUrl", "facebook", "instagram", "phone", "email", "consent",
 ];
 

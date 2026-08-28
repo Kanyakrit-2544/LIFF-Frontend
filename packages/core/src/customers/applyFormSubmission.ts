@@ -134,6 +134,8 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
   };
 
   // เขียนกลับเข้า customers ตาม bindTo ของแต่ละ field
+  if (typeof answers.title === "string") set.title = answers.title;
+  if (typeof answers.heardFrom === "string") set.heardFrom = answers.heardFrom;
   if (typeof answers.fullNameTh === "string") set.displayName = answers.fullNameTh;
   if (typeof answers.nickname === "string") set.nickname = answers.nickname;
   if (typeof answers.fullNameEn === "string") set.fullNameEn = answers.fullNameEn;

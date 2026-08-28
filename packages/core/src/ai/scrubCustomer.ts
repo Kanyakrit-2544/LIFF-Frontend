@@ -14,6 +14,8 @@ export interface ScrubbedCustomer {
   _id: string;
   status: RecordStatus;
   mergedInto: string | null;
+  title: string | null;
+  heardFrom: string | null;
   displayName: string | null;
   nickname: string | null;
   fullNameEn: string | null;
@@ -42,6 +44,8 @@ export function scrubCustomer(c: CustomerDoc, now = new Date()): ScrubbedCustome
     _id: c._id,
     status: c.status,
     mergedInto: c.mergedInto ?? null,
+    title: c.title ?? null,
+    heardFrom: c.heardFrom ?? null,
     displayName: personToken(c.displayName),
     nickname: personToken(c.nickname),
     fullNameEn: personToken(c.fullNameEn),

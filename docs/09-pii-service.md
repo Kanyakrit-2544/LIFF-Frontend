@@ -1,4 +1,8 @@
-# Phase 9 — PII Scrubber / Restore เป็น Service
+# Phase 9 — PII Scrubber / Restore เป็น Service (Historical)
+
+> สถานะปัจจุบันหลัง S9: เอกสารนี้เป็นบันทึกแนวทางเก่า/แนวทางอนาคตเท่านั้น ยังไม่ใช่ active architecture
+> ระบบจริงตอนนี้ไม่ใช้ `services/pii`, ไม่ใช้ restore flow และไม่สร้าง collection `pii_tokens`
+> WF-C เขียน Google Sheets แบบ map ตรง ส่วนข้อมูลเข้า AI ไปทาง S9 AI mirror ที่ scrub ใน API ก่อนส่งให้ n8n
 
 อ้างอิงของจริงใน `raw input/PII_Scrubber_Mac.command` + `PII_Restore_Mac.command`
 
@@ -46,7 +50,7 @@ code = sha256(salt + "|" + entity_type + "|" + value)[:n]
 |---|---|---|
 | Input | ไฟล์ในโฟลเดอร์ | JSON payload ผ่าน HTTP |
 | Output | เขียนไฟล์ `_for_ai.md` | ตอบกลับใน response |
-| Map | ไฟล์ `.map.json` บนดิสก์ | `pii_tokens` ใน Mongo + TTL |
+| Map | ไฟล์ `.map.json` บนดิสก์ | แนวทางเก่าเคยเสนอ token vault; ตอนนี้ไม่ใช้ในระบบจริง |
 | Salt | ไฟล์ `.salt` ต่อโฟลเดอร์ | env `PII_SCRUB_SALT` ตัวเดียวทั้งระบบ |
 | เลือก category | ถาม checklist ทาง stdin | ส่งมาใน request |
 | ค่าจริงใน map | **plaintext ใน JSON** | ⚠️ ต้องเข้ารหัส (ดู 9.4) |
@@ -65,7 +69,7 @@ services/pii/
 │   ├── recognizers.py    # ⬅️ ยกมาทั้งดุ้น: CATEGORIES, THAI_*, custom Pattern (บรรทัด ~85–210)
 │   ├── analyzer.py       # ⬅️ analyze_all(), column_results(), make_code(), scrub()
 │   ├── restore.py        # ⬅️ restore_text() จาก PII_Restore_Mac.command
-│   └── vault.py          # 🆕 อ่าน/เขียน pii_tokens แทนไฟล์ .map.json
+│   └── vault.py          # แนวทางเก่า; ไม่อยู่ใน active code
 ├── api/
 │   ├── scrub.py          # 🆕 HTTP handler
 │   └── restore.py        # 🆕 HTTP handler
@@ -101,7 +105,7 @@ CLI ถือว่าใครรันไฟล์ได้ = มีสิท�
 → `/api/pii/restore` ต้องเช็ค HMAC + `jobId` เป็นของ caller + **log ทุกครั้งที่ restore** (ไม่งั้นกลายเป็น PII oracle: ยิง token สุ่มเพื่อดึงข้อมูลจริงออกมา)
 
 **4. ไม่มี TTL**
-map ค้างในโฟลเดอร์ตลอดไป → `pii_tokens` ต้องมี `expiresAt` + TTL index (ตั้งไว้แล้วใน docs/02)
+map ค้างในโฟลเดอร์ตลอดไป → ถ้ากลับมาทำ restore service จริงต้องออกแบบที่เก็บ token ใหม่ และแยกจาก S9 AI mirror ให้ชัด
 
 ---
 
@@ -116,8 +120,7 @@ Vercel Python function มีเพดานขนาด bundle (~250MB unzipped
 | C. Vercel + regex-only (ตัด spaCy ออก) | เบา, deploy ที่เดียว | **ตรวจชื่อคนไทยได้แย่ลงมาก** — PERSON พึ่ง NER เป็นหลัก |
 | D. รัน CLI แบบ batch อย่างเดียว ไม่ทำ service | ง่ายสุด, ปลอดภัยสุด | ใช้ real-time ไม่ได้ |
 
-**เจ้าของงานกำหนดแล้วว่า scrub อยู่ในเส้นทางหลัก** (`ได้ข้อมูล → scrub → AI ใน n8n → Sheets`)
-→ **D ใช้ไม่ได้** ต้องเป็น service จริงตั้งแต่ก่อน S8
+ข้อความด้านล่างเป็นแผนเดิมก่อน S8/S9 และไม่ใช่สถานะปัจจุบันแล้ว
 
 **เลือกแล้ว: A — container แยก** (ทำเป็นแบบจำลองให้เหมือนใช้งานจริง)
 
@@ -133,13 +136,9 @@ docker-compose.yml             → service `pii` แยกจาก `n8n` คน
 
 ## 9.6 จุดที่จะใช้จริงในโปรเจกต์นี้
 
-| ที่ | ใช้ทำอะไร | เฟส |
-|---|---|---|
-| **WF-C ก่อนเขียน Google Sheets** ⭐ | scrub ข้อมูลลูกค้า → ส่งให้ AI ใน n8n → restore → เขียน Sheets | **สโคปนี้** |
-| Facebook Lead Ads | scrub ก่อน enrich | เฟส 2 |
+ตอนนี้ยังไม่มีจุดที่ใช้ service นี้จริงใน runtime
 
-**ผลต่อลำดับ implement:** `services/pii` ต้องเสร็จ **ก่อน S8** (Sheets sync) ไม่ใช่ S10
-ลำดับใหม่: … → S7 (form submit) → **S8a services/pii** → S8b WF-C + AI → S9
+ถ้ากลับมามี free text ขนาดใหญ่หรือไฟล์ import ที่ต้องส่งให้ AI ภายหลัง ให้เปิดสเปกใหม่แยกจาก WF-C/S9
 
 ---
 
@@ -151,6 +150,6 @@ docker-compose.yml             → service `pii` แยกจาก `n8n` คน
 - [ ] เบอร์ไทยทุกรูปแบบ `0812345678` / `081-234-5678` / `081 234 5678` / `+66812345678` ถูกจับครบ
 - [ ] เลขบัตรประชาชน 13 หลักทั้งมีขีดและไม่มีขีด
 - [ ] ตาราง/CSV — หัวคอลัมน์ "เบอร์" ทำให้ค่าในคอลัมน์นั้นถูกจับแม้ไม่มีบริบท
-- [ ] `pii_tokens` ไม่มี plaintext (`db.pii_tokens.findOne()` ตรวจด้วยตา)
+- [ ] token vault ใหม่ไม่มี plaintext ถ้ากลับมาสร้าง restore service จริง
 - [ ] restore ด้วย `jobId` ของ caller อื่น → `403` + มี log
 - [ ] token หมดอายุ → restore ไม่ได้ ตอบ error ที่เข้าใจได้ (ไม่ใช่ 500)

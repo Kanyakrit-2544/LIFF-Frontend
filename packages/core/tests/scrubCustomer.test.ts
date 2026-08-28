@@ -16,6 +16,7 @@ function customer(over: Partial<CustomerDoc> = {}): CustomerDoc {
     _id: "cus_scrub",
     status: "active",
     mergedInto: null,
+    title: null, heardFrom: null,
     displayName: "สมชาย ใจดี",
     nickname: "ชาย",
     fullNameEn: "Somchai Jaidee",

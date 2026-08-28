@@ -126,9 +126,7 @@
 - [ ] merge แล้ว winner/loser ถูกตั้ง `aiSync.dirty` ทั้งคู่ และ loser ส่ง `status:"merged"` ไป AI mirror
 - [ ] ต่อด้วย `ai_user` แล้วอ่าน `line_crm_dev.customers` → ต้องถูกปฏิเสธ
 - [ ] ต่อด้วย `mirror_user` แล้วอ่าน `line_crm_dev.customers` → ต้องถูกปฏิเสธ
-- [ ] `scrub` → ข้อความไม่มี PII เหลือ; `restore` → กลับเป็นเหมือนเดิม 100%
-- [ ] `pii_tokens` มี TTL และหมดอายุจริง
-- [ ] `restore` ด้วย jobId ของคนอื่น → `403`
+- [ ] `scrubCustomer` → payload AI mirror ไม่มีชื่อ/เบอร์/อีเมลดิบเหลือ
 
 ## 6.12 Load / Smoke
 

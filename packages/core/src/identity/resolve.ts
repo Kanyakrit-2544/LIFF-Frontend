@@ -64,6 +64,8 @@ function buildNewCustomer(customerId: string, input: ResolveCustomerInput): Cust
     _id: customerId,
     status: "active",
     mergedInto: null,
+    title: null,
+    heardFrom: null,
     displayName: input.create?.displayName ?? null,
     nickname: null,
     fullNameEn: null,

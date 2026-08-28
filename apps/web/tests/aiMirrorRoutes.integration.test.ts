@@ -64,6 +64,7 @@ async function insertCustomer() {
     _id: id,
     status: "active",
     mergedInto: null,
+    title: null, heardFrom: null,
     displayName: "สมชาย ใจดี",
     nickname: null,
     fullNameEn: null,

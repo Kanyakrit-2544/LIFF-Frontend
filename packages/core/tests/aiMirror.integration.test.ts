@@ -50,6 +50,7 @@ function makeCustomer(over: Partial<CustomerDoc> = {}): CustomerDoc {
     _id: id,
     status: "active",
     mergedInto: null,
+    title: null, heardFrom: null,
     displayName: "สมชาย ใจดี",
     nickname: "ชาย",
     fullNameEn: "Somchai Jaidee",
@@ -150,6 +151,7 @@ describe.runIf(runIntegration)("S9 AI mirror queue", () => {
     const older = new Date("2026-08-01T00:00:00Z");
     const winner = await insertCustomer({ displayName: "ตัวหลัก", updatedAt: older, createdAt: older, aiSync: { dirty: false, syncedAt: null, lockedAt: null, attempts: 0 } });
     const loser = await insertCustomer({
+      title: null, heardFrom: null,
       displayName: "ตัวรอง",
       phone: "+66819999999",
       updatedAt: new Date("2026-08-02T00:00:00Z"),

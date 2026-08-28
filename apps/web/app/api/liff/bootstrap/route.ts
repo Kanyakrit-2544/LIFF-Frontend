@@ -48,6 +48,8 @@ export async function GET() {
     // ค่าที่ระบบมีอยู่แล้ว ใช้เติมลงฟอร์มให้ลูกค้าไม่ต้องพิมพ์ซ้ำ
     // S9: DB หลักเก็บ phone/email เป็น plaintext normalized แล้ว
     const prefill: Record<string, unknown> = {
+      title: customer.title ?? "",
+      heardFrom: customer.heardFrom ?? "",
       fullNameTh: customer.displayName ?? "",
       nickname: customer.nickname ?? "",
       fullNameEn: customer.fullNameEn ?? "",

@@ -11,7 +11,7 @@ import type { FormSchemaDoc, FieldOption } from "../packages/core/src/forms/type
 import { closeClient } from "../packages/core/src/db/client";
 
 const FORM_ID = "customer_onboarding";
-const VERSION = "v1";
+const VERSION = "v4";
 
 // ปีเกิด พ.ศ. (D16) — เก็บเป็น select ธรรมดาโดยตั้งใจ ไม่ทำ type พิเศษ
 // จะได้ไม่ต้องแก้โค้ดทั้ง client และ server เวลาอยากเปลี่ยนช่วงปี
@@ -45,6 +45,16 @@ const schema: FormSchemaDoc = {
       title: { th: "ข้อมูลของคุณ", en: "Your details" },
       fields: [
         {
+          id: "title", type: "select", label: { th: "คำนำหน้า", en: "Title" },
+          bindTo: "customers.title",
+          options: [
+            { value: "นาย", label: { th: "นาย", en: "Mr." } },
+            { value: "นาง", label: { th: "นาง", en: "Mrs." } },
+            { value: "นางสาว", label: { th: "นางสาว", en: "Ms." } },
+            { value: "ไม่ระบุ", label: { th: "ไม่ระบุ", en: "Prefer not to say" } },
+          ],
+        },
+        {
           id: "fullNameTh", type: "text", label: { th: "ชื่อ-นามสกุล", en: "Full name" },
           placeholder: { th: "เช่น สมชาย ใจดี" }, help: { th: "ชื่อจริงสำหรับออกใบเสร็จและใบประกาศ" },
           bindTo: "customers.displayName", pii: true,
@@ -72,6 +82,30 @@ const schema: FormSchemaDoc = {
           id: "email", type: "email", label: { th: "อีเมล", en: "Email" },
           placeholder: { th: "you@example.com" }, bindTo: "customers.email", pii: true,
           validate: { maxLength: 254 },
+        },
+      ],
+    },
+    {
+      id: "discovery",
+      title: { th: "เห็นเราจากช่องทางไหน", en: "How did you find us" },
+      fields: [
+        {
+          id: "heardFrom", type: "select", label: { th: "เห็นเราจากช่องทางไหน", en: "Found us via" },
+          bindTo: "customers.heardFrom",
+          options: [
+            { value: "Facebook", label: { th: "Facebook" } },
+            { value: "Instagram", label: { th: "Instagram" } },
+            { value: "TikTok", label: { th: "TikTok" } },
+            { value: "YouTube", label: { th: "YouTube" } },
+            { value: "LINE OA", label: { th: "LINE Official Account" } },
+            { value: "Website", label: { th: "เว็บไซต์" } },
+            { value: "Google", label: { th: "ค้นหาใน Google" } },
+            { value: "เพื่อนแนะนำ", label: { th: "เพื่อนแนะนำ" } },
+            { value: "เคยเรียนแล้ว", label: { th: "เคยเรียนกับเราแล้ว" } },
+            { value: "งานอีเวนต์", label: { th: "งานอีเวนต์ / บูธ" } },
+            { value: "หน้าร้าน", label: { th: "หน้าร้าน / ป้าย" } },
+            { value: "อื่น ๆ", label: { th: "อื่น ๆ" } },
+          ],
         },
       ],
     },
@@ -128,6 +162,14 @@ async function main() {
     console.log("\n(--dry: ไม่เขียน DB)");
     return;
   }
+
+  // ปิดเวอร์ชันเก่า — customer_profiles เดิมยังอ้าง formVersion นั้นอยู่ จึงไม่ลบทิ้ง
+  const db = await (await import("../packages/core/src/db/client")).getDb();
+  const archived = await db.collection("form_schemas").updateMany(
+    { formId: FORM_ID, version: { $ne: VERSION }, status: "published" },
+    { $set: { status: "archived" } }
+  );
+  if (archived.modifiedCount) console.log(`\n📦 archive เวอร์ชันเก่า ${archived.modifiedCount} ตัว`);
 
   await upsertSchema(schema);
   const published = await getPublishedSchema(FORM_ID);

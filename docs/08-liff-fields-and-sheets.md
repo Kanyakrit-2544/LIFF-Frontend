@@ -37,12 +37,14 @@
 
 | Field | ที่มา | required | สถานะ |
 |---|---|---|---|
+| `title` | ลูกค้ากรอก | | ✔ ยืนยัน |
 | `fullNameTh` | ลูกค้ากรอก (prefill จาก LINE displayName) | ✅ | ✔ ยืนยัน |
 | `nickname` | ลูกค้ากรอก | | ✔ ยืนยัน |
 | `fullNameEn` | ลูกค้ากรอก | | ✔ ยืนยัน |
 | `birthYear` | ลูกค้ากรอก — **ปี พ.ศ.** | | ✔ ยืนยัน (แก้จาก "อายุ" ของไฟล์เดิม) |
 | `phone` | ลูกค้ากรอก | ✅ | ⚠️ แก้จาก "ดึงเอง" → กรอก (§8.1) |
 | `email` | ลูกค้ากรอก + prefill ถ้าได้ | | ⚠️ แก้จาก "ดึงเอง" → กรอก+prefill (§8.1) |
+| `heardFrom` | ลูกค้าเลือกจาก dropdown | | ✔ เพิ่มตาม requirement ล่าสุด |
 | `facebook` | ลูกค้ากรอก | | ✔ ยืนยัน — แยกช่อง ไม่บังคับ |
 | `instagram` | ลูกค้ากรอก | | ✔ ยืนยัน — แยกช่อง ไม่บังคับ |
 | `consentDataProcessing` | checkbox | ✅ | ✔ ยืนยัน |
@@ -58,13 +60,16 @@
 `pictureUrl` (รูป) · `lineDisplayName` (readonly)
 
 ### Section 2 — ข้อมูลลูกค้า
-`fullNameTh` ✅ · `nickname` · `fullNameEn` · `birthYear` (select พ.ศ.) · `phone` ✅ · `email` (prefill ถ้ามี)
+`title` · `fullNameTh` ✅ · `nickname` · `fullNameEn` · `birthYear` (select พ.ศ.) · `phone` ✅ · `email` (prefill ถ้ามี)
 
-### Section 3 — ช่องทางอื่น (ไม่บังคับ)
+### Section 3 — เห็นเราจากช่องทางไหน
+`heardFrom` (dropdown)
+
+### Section 4 — ช่องทางอื่น (ไม่บังคับ)
 `facebook` · `instagram`
 > แยก 3 ช่องตามที่คุณเลือก (LINE ระบบรู้เองอยู่แล้ว) — เตรียม match Meta ในเฟส 2
 
-### Section 4 — PDPA
+### Section 5 — PDPA
 `consentDataProcessing` ✅ · `consentMarketing`
 
 ทุก field กำหนดใน `form_schemas` collection → เพิ่ม/แก้คำถามได้โดยไม่ต้อง deploy
@@ -78,29 +83,31 @@
 | Col | Column ID | Header | ที่มา |
 |---|---|---|---|
 | A | `customerId` | Customer ID | ระบบ — 🔒 row key ห้ามแก้/ลบ |
-| B | `fullNameTh` | ชื่อ-นามสกุล | LIFF |
-| C | `nickname` | ชื่อเล่น | LIFF |
-| D | `fullNameEn` | Name Eng. | LIFF |
-| E | `birthYear` | ปีเกิด (พ.ศ.) | LIFF |
-| F | `phone` | เบอร์ | LIFF |
-| G | `email` | อีเมล | LIFF |
-| H | `lineDisplayName` | LINE ชื่อ | LINE API |
-| I | `facebook` | Facebook | LIFF |
-| J | `instagram` | Instagram | LIFF |
-| K | `status` | สถานะ | ระบบ — lead / inactive |
-| L | `source` | Source | ระบบ — line |
-| M | `firstInteractionAt` | วันที่แอดเพื่อน | ระบบ |
-| N | `firstMessageAt` | วันที่ทักครั้งแรก | ระบบ |
-| O | `formSubmittedAt` | วันที่กรอกฟอร์ม | ระบบ |
-| P | `consent` | PDPA | ระบบ — ✅/❌ + วันที่ |
-| Q | `updatedAt` | อัปเดตล่าสุด | ระบบ |
-| **R** | `staffNote` | **หมายเหตุพนักงาน** | 👤 staff — ⚠️ **ระบบไม่แตะ** |
+| B | `title` | คำนำหน้า | LIFF |
+| C | `fullNameTh` | ชื่อ-นามสกุล | LIFF |
+| D | `nickname` | ชื่อเล่น | LIFF |
+| E | `fullNameEn` | Name Eng. | LIFF |
+| F | `birthYear` | ปีเกิด (พ.ศ.) | LIFF |
+| G | `age` | อายุ | ระบบ — คำนวณจากปีเกิด |
+| H | `phone` | เบอร์ | LIFF |
+| I | `email` | อีเมล | LIFF |
+| J | `lineDisplayName` | LINE ชื่อ | LINE API |
+| K | `facebook` | Facebook | LIFF |
+| L | `instagram` | Instagram | LIFF |
+| M | `heardFrom` | เห็นเราจากช่องทางไหน | LIFF |
+| N | `tags` | แท็ก | ระบบ |
+| O | `firstInteractionAt` | วันที่แอดเพื่อน | ระบบ |
+| P | `firstMessageAt` | วันที่ทักครั้งแรก | ระบบ |
+| Q | `formSubmittedAt` | วันที่กรอกฟอร์ม | ระบบ |
+| R | `consent` | PDPA | ระบบ — ✅/❌ + วันที่ |
+| S | `consentMarketing` | รับข่าวสาร | ระบบ |
+| T | `pendingMerge` | ⚠️ เบอร์ซ้ำ รอตรวจ | ระบบ |
+| U | `updatedAt` | อัปเดตล่าสุด | ระบบ |
+| **V** | `staffNote` | **หมายเหตุพนักงาน** | 👤 staff — ⚠️ **ระบบไม่แตะ** |
 
-> **Column ID คือสิ่งที่ AI ใช้ match** (ข้อ 2 ที่คุณตอบ) — คุณกำหนด/เปลี่ยนชุดนี้ได้ AI จะจับคู่ตามนี้
-> เก็บ ID ไว้ใน **แถว 1 ของแท็บ `_Schema`** เพื่อให้แก้ได้โดยไม่ต้อง deploy — ดู docs/04
+ไม่เก็บ `customerStatus` และ `source.channel` ใน Sheet แล้ว — ข้อมูลสองตัวนี้อยู่ใน MongoDB สำหรับระบบภายในเท่านั้น
 
-แท็บ `_Log` — บันทึกทุกรอบ sync (เวลา, จำนวนแถว, error)
-แท็บ `_Schema` — Column ID ที่ AI ใช้ match
+แท็บที่ใช้จริงมีแค่ `Customers`; `_Log` และ `_Schema` เป็นของ flow เก่าและลบได้
 
 ---
 

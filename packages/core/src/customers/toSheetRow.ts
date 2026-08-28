@@ -25,6 +25,7 @@ const dt = (v: Date | null | undefined) => (v ? v.toISOString().slice(0, 16).rep
 
 export const SHEET_COLUMNS: SheetColumn[] = [
   { id: "customerId", header: "Customer ID", owner: "system", value: (c) => c._id },
+  { id: "title", header: "คำนำหน้า", owner: "system", value: (c) => c.title ?? "" },
   { id: "fullNameTh", header: "ชื่อ-นามสกุล", owner: "system", value: (c) => c.displayName ?? "" },
   { id: "nickname", header: "ชื่อเล่น", owner: "system", value: (c) => c.nickname ?? "" },
   { id: "fullNameEn", header: "Name Eng.", owner: "system", value: (c) => c.fullNameEn ?? "" },
@@ -35,8 +36,7 @@ export const SHEET_COLUMNS: SheetColumn[] = [
   { id: "lineDisplayName", header: "ชื่อใน LINE", owner: "system", value: (c) => c.lineDisplayName ?? "" },
   { id: "facebook", header: "Facebook", owner: "system", value: (c) => c.facebook ?? "" },
   { id: "instagram", header: "Instagram", owner: "system", value: (c) => c.instagram ?? "" },
-  { id: "status", header: "สถานะ", owner: "system", value: (c) => c.customerStatus ?? "" },
-  { id: "source", header: "ช่องทางที่มา", owner: "system", value: (c) => (c.sources ?? []).join(", ") },
+  { id: "heardFrom", header: "เห็นเราจากช่องทางไหน", owner: "system", value: (c) => c.heardFrom ?? "" },
   { id: "tags", header: "แท็ก", owner: "system", value: (c) => (c.tags ?? []).join(", ") },
   { id: "firstInteractionAt", header: "วันที่แอดเพื่อน", owner: "system", value: (c) => d(c.firstInteractionAt) },
   { id: "firstMessageAt", header: "วันที่ทักครั้งแรก", owner: "system", value: (c) => d(c.firstMessageAt) },

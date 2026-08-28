@@ -288,39 +288,10 @@ db.inbound_events.createIndex({ receivedAt: 1 }, { expireAfterSeconds: 2592000 }
 
 ---
 
-### `integrations` — Config ของ Channel (ไม่ใช่ mapping ID)
-```jsonc
-{
-  "_id": "line:2007xxxxxx",
-  "provider": "line",
-  "channelId": "2007xxxxxx",
-  "displayName": "3S Suksonsin OA",
-  "enabled": true,
-  "config": { "liffId": "2007xxxxxx-abcdefgh", "loginChannelId": "2007yyyyyy" },
-  "secretRef": { "accessToken": "env:LINE_CHANNEL_ACCESS_TOKEN" },  // ⚠️ เก็บแค่ "ชื่อ env" ไม่เก็บค่า
-  "createdAt": "..."
-}
-```
-**ทำไมแยกจาก `identities`:** โจทย์เขียนรวมกัน แต่สองอย่างนี้คนละ concern — `identities` = "คนนี้คือใครในแพลตฟอร์มนั้น" (per-customer), `integrations` = "เราต่อกับแพลตฟอร์มไหนบ้าง" (per-tenant)
-
----
-
-### `pii_tokens` — Vault สำหรับ Scrubber/Restore
-```jsonc
-{
-  "_id": "PHONE_a3f9c2",
-  "jobId": "job_01JQ...",
-  "type": "phone",             // name | phone | email | address | id_card
-  "valueEnc": "v1:iv:ct:tag",
-  "customerId": "cus_...",
-  "createdAt": "...",
-  "expiresAt": "2026-09-26T00:00:00Z"
-}
-```
-```js
-db.pii_tokens.createIndex({ jobId: 1 })
-db.pii_tokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
-```
+`integrations` และ `pii_tokens` เคยอยู่ในแผนเก่า แต่โค้ดปัจจุบันไม่ได้ใช้แล้ว:
+- LINE/LIFF config อ่านจาก env โดยตรง
+- WF-C ไม่ใช้ scrub/restore แล้ว
+- S9 ใช้ AI mirror แบบ scrubbed payload โดยไม่ต้องมี token vault
 
 ---
 

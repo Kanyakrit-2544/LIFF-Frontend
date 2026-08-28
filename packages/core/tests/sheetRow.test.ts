@@ -4,6 +4,7 @@ import type { CustomerDoc } from "../src/db/models";
 
 const base = (o: Partial<CustomerDoc> = {}): CustomerDoc => ({
   _id: "cus_01TEST", status: "active", mergedInto: null,
+  title: null, heardFrom: "Facebook",
   displayName: "สมชาย ใจดี", nickname: "ชาย", fullNameEn: "Somchai Jaidee", birthYear: 2535,
   lineDisplayName: "Somchai", pictureUrl: null, facebook: "fb.somchai", instagram: null,
   phone: "+66812345678", email: "somchai@gmail.com",
@@ -40,6 +41,11 @@ describe("นิยามคอลัมน์", () => {
   });
   it("ไม่มี id ซ้ำ", () => {
     expect(new Set(SHEET_COLUMNS.map((c) => c.id)).size).toBe(SHEET_COLUMNS.length);
+  });
+  it("ไม่ส่งสถานะระบบหรือ source ระบบเข้า Sheet", () => {
+    const ids = SHEET_COLUMNS.map((c) => c.id);
+    expect(ids).not.toContain("customerStatus");
+    expect(ids).not.toContain("source");
   });
   it("systemRange ไม่กินคอลัมน์ของพนักงาน", () => {
     expect(systemRange(5)).toBe(`Customers!A5:${columnLetter(SYSTEM_COLUMNS.length - 1)}5`);
@@ -78,5 +84,22 @@ describe("toSheetRow", () => {
     const i = SYSTEM_COLUMNS.findIndex((c) => c.id === "pendingMerge");
     expect(toSheetRow(base())[i]).toBe("");
     expect(toSheetRow(base({ pendingMerge: { candidateId: "cus_อื่น", reason: "phone_match", at: new Date() } }))[i]).toBe("cus_อื่น");
+  });
+  it("ส่งคำตอบที่ลูกค้าระบุว่าเห็นเราจากช่องทางไหนเข้า Sheet", () => {
+    const row = toSheetRow(base());
+    expect(row[SYSTEM_COLUMNS.findIndex((c) => c.id === "heardFrom")]).toBe("Facebook");
+  });
+});
+
+describe("คำนำหน้าชื่อ", () => {
+  it("อยู่ก่อนชื่อ-นามสกุลในชีต และ staffNote ยังท้ายสุด", () => {
+    const ids = SHEET_COLUMNS.map((c) => c.id);
+    expect(ids.indexOf("title")).toBeLessThan(ids.indexOf("fullNameTh"));
+    expect(ids.at(-1)).toBe("staffNote");
+  });
+  it("ค่าว่างเป็นสตริงว่าง ไม่ใช่ null", () => {
+    const i = SYSTEM_COLUMNS.findIndex((c) => c.id === "title");
+    expect(toSheetRow(base({ title: null }))[i]).toBe("");
+    expect(toSheetRow(base({ title: "นางสาว" }))[i]).toBe("นางสาว");
   });
 });

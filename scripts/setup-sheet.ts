@@ -3,7 +3,7 @@
  *
  *   npm run setup:sheet
  *
- * สร้างแท็บ Customers + _Log, เขียนหัวตาราง, ตรึงแถวแรก, ป้องกันคอลัมน์ของระบบ
+ * สร้าง/อัปเดตแท็บ Customers, ลบแท็บเก่าที่ไม่ได้ใช้, เขียนหัวตาราง, ตรึงแถวแรก, ป้องกันคอลัมน์ของระบบ
  */
 import { HEADERS, SYSTEM_COLUMNS, columnLetter } from "../packages/core/src/customers/toSheetRow";
 import { getAccessToken, loadServiceAccount, sheetsApi } from "./lib/googleAuth";
@@ -11,7 +11,7 @@ import { getAccessToken, loadServiceAccount, sheetsApi } from "./lib/googleAuth"
 const SHEET_ID = process.env.GOOGLE_SHEET_ID ?? "";
 const SA_PATH = process.env.GOOGLE_SERVICE_ACCOUNT_FILE ?? "";
 const DATA_TAB = "Customers";
-const LOG_TAB = "_Log";
+const OBSOLETE_TABS = ["_Log", "_Schema"];
 
 async function main() {
   if (!SHEET_ID) throw new Error("ต้องตั้ง GOOGLE_SHEET_ID");
@@ -26,7 +26,7 @@ async function main() {
 
   const existing = new Map(meta.sheets.map((s) => [s.properties.title, s.properties.sheetId]));
   const requests: unknown[] = [];
-  for (const title of [DATA_TAB, LOG_TAB]) {
+  for (const title of [DATA_TAB]) {
     if (!existing.has(title)) {
       requests.push({ addSheet: { properties: { title } } });
       console.log(`✚ สร้างแท็บ ${title}`);
@@ -36,7 +36,17 @@ async function main() {
   }
   if (requests.length > 0) await api.batchUpdate(requests);
 
-  const after = (await api.meta()) as { sheets: { properties: { sheetId: number; title: string } }[] };
+  let after = (await api.meta()) as { sheets: { properties: { sheetId: number; title: string } }[] };
+  const cleanup = after.sheets
+    .filter((s) => OBSOLETE_TABS.includes(s.properties.title))
+    .map((s) => ({ deleteSheet: { sheetId: s.properties.sheetId } }));
+  if (cleanup.length > 0) {
+    await api.batchUpdate(cleanup);
+    for (const title of after.sheets.map((s) => s.properties.title).filter((t) => OBSOLETE_TABS.includes(t))) {
+      console.log(`− ลบแท็บเก่า ${title}`);
+    }
+    after = (await api.meta()) as { sheets: { properties: { sheetId: number; title: string } }[] };
+  }
   const dataId = after.sheets.find((s) => s.properties.title === DATA_TAB)!.properties.sheetId;
 
   // หัวตาราง — เขียนทับทุกครั้งเพื่อให้ตรงกับ SHEET_COLUMNS เสมอ

@@ -21,6 +21,7 @@
     "seed:form": "tsx --env-file=apps/web/.env.local scripts/seed-form-schema.ts",
     "env:vercel": "tsx scripts/make-vercel-env.ts",
     "setup:sheet": "tsx --env-file=apps/web/.env.local scripts/setup-sheet.ts",
+    "cleanup:db-obsolete": "tsx --env-file=apps/web/.env.local scripts/cleanup-obsolete-db.ts",
     "verify:db-users": "tsx scripts/verify-db-users.ts",
     "reset:demo": "tsx --env-file=apps/web/.env.local scripts/reset-demo.ts"
   },

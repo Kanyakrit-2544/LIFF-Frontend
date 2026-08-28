@@ -61,13 +61,6 @@ export const INDEX_SPECS: Spec[] = [
     ],
   },
   {
-    collection: COLLECTIONS.piiTokens,
-    indexes: [
-      { key: { jobId: 1 }, name: "ix_jobId" },
-      { key: { expiresAt: 1 }, name: "ttl_expiresAt", expireAfterSeconds: 0 },
-    ],
-  },
-  {
     collection: "rate_limits",
     indexes: [{ key: { expiresAt: 1 }, name: "ttl_expiresAt", expireAfterSeconds: 0 }],
   },

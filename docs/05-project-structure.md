@@ -81,18 +81,6 @@ line-crm/
 │   │
 │   └── ai/                              # ยังไม่ใช้ — รอ S10/S11 หรือ Presidio จริง
 │
-├── services/
-│   └── pii/                             # Python — ⚠️ critical path ของ WF-C
-│       ├── api/
-│       │   ├── scrub.py                 # Vercel Python Function
-│       │   └── restore.py
-│       ├── lib/
-│       │   ├── scrubber.py              # ⬅️ script เดิมของคุณ
-│       │   ├── restorer.py              # ⬅️ script เดิมของคุณ
-│       │   └── vault.py                 # อ่าน/เขียน pii_tokens
-│       ├── tests/
-│       └── requirements.txt
-│
 ├── workflows/                           # n8n export (commit ลง git)
 │   ├── WF-A-line-event.json
 │   ├── WF-B-form-submitted.json

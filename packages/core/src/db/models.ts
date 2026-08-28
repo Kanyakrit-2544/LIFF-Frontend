@@ -8,8 +8,6 @@ export const COLLECTIONS = {
   formSchemas: "form_schemas",
   interactions: "interactions",
   inboundEvents: "inbound_events",
-  integrations: "integrations",
-  piiTokens: "pii_tokens",
   auditLogs: "audit_logs",
 } as const;
 
@@ -35,6 +33,10 @@ export interface CustomerDoc {
   status: RecordStatus;
   mergedInto: string | null;
 
+  /** คำนำหน้า: นาย · นาง · นางสาว · ไม่ระบุ */
+  title: string | null;
+  /** ลูกค้าเห็นเราจากช่องทางไหน */
+  heardFrom: string | null;
   displayName: string | null;
   nickname: string | null;
   fullNameEn: string | null;
@@ -163,17 +165,6 @@ export interface InboundEventDoc {
   /** ตีตราตอนจองงาน — กัน worker สองตัวหยิบชิ้นเดียวกัน */
   claimId?: string;
   claimedAt?: Date;
-}
-
-export interface PiiTokenDoc {
-  _id: string; // "<TH_PHONE_a3f9>"
-  jobId: string;
-  type: string;
-  category: string;
-  valueEnc: string; // ⚠️ ไม่เก็บ plaintext (docs/09 §9.4)
-  customerId: string | null;
-  createdAt: Date;
-  expiresAt: Date;
 }
 
 export interface AuditLogDoc {

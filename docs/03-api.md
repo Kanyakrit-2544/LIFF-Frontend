@@ -194,7 +194,7 @@ x-timestamp: 1756180260      # ต่างจาก now เกิน 300 วิ
 
 ---
 
-## 3.8 `GET /api/internal/sheets/pending?limit=200`
+## 3.8 `POST /api/internal/sheets/pending`
 
 **Logic:** `findAndModify` set `sheetSync.lockedAt = now` (lease 5 นาที) แล้วคืนรายการ — worker 2 ตัวจะไม่ได้ของชุดเดียวกัน
 
@@ -202,12 +202,13 @@ x-timestamp: 1756180260      # ต่างจาก now เกิน 300 วิ
 ```jsonc
 { "ok": true, "rows": [{
     "rowKey": "cus_01JQZX...", "customerId": "cus_01JQZX...",
-    "values": ["cus_01JQZX...", "สมชาย ใจดี", "08x-xxx-1234", "so***@gmail.com",
-               "lead", "line", "2026-08-20", "2026-08-26", "retail", "50k_100k", "seo,ads", ""]
+    "values": ["cus_01JQZX...", "นาย", "สมชาย ใจดี", "ชาย", "Somchai Jaidee",
+               "2535", "34", "+66812345678", "somchai@gmail.com", "Somchai",
+               "fb.somchai", "", "Facebook", "form-completed", "2026-08-20",
+               "2026-08-21", "2026-08-26", "✓ 2026-08-26", "✗", "", "2026-08-26 04:16"]
   }],
-  "columns": ["customerId","displayName","phone","email","status","source",
-              "firstInteraction","lastUpdate","businessType","budget","services","staffNote"],
-  "leaseUntil": "2026-08-26T04:16:00Z" }
+  "headers": ["Customer ID", "คำนำหน้า", "...", "หมายเหตุพนักงาน"],
+  "systemColumnCount": 21 }
 ```
 **หมายเหตุ:** Vercel เป็นคน "แปลง customer → แถว Sheets" ไม่ใช่ n8n — เพราะการ mask PII เป็น business rule
 
