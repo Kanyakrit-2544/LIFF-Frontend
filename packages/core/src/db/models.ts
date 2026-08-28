@@ -110,6 +110,19 @@ export interface CustomerDoc {
    */
   pendingMerge: { candidateId: string; reason: string; at: Date } | null;
 
+  /** ที่มาจากโฆษณา/คอนเทนต์ — เติมเมื่อลูกค้ามาจาก Facebook Lead (docs/28) */
+  leadAttribution?: {
+    pageId: string | null;
+    formId: string | null;
+    adId: string | null;
+    courseCode: string | null;
+    campaignName: string | null;
+    adOrOrganic: "ad" | "organic" | "unknown";
+    /** true = ยังไม่มี mapping ต้องมีคนเติมแล้วรันย้อนหลัง (D34) */
+    attributionPending: boolean;
+    capturedAt: Date;
+  } | null;
+
   sheetSync: {
     dirty: boolean;
     rowKey: string;

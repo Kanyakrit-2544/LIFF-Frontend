@@ -39,6 +39,18 @@ const securitySchema = z.object({
   ALLOWED_LIFF_ORIGINS: z.string().min(1),
 });
 
+/**
+ * Facebook Lead Ads — optional ทุกตัวโดยตั้งใจ (D32)
+ * ยังไม่ตั้งค่า = ฟีเจอร์ปิดเงียบ ระบบส่วนอื่นต้องไม่พัง
+ */
+const facebookSchema = z.object({
+  FACEBOOK_APP_SECRET: z.string().optional(),
+  FACEBOOK_VERIFY_TOKEN: z.string().optional(),
+  FACEBOOK_PAGE_TOKEN: z.string().optional(),
+  FACEBOOK_PAGE_ID: z.string().optional(),
+  FACEBOOK_GRAPH_VERSION: z.string().default("v21.0"),
+});
+
 const n8nSchema = z.object({
   /** dev = false (pull mode) / prod = true — ดู docs/07 */
   N8N_PUSH_ENABLED: z
@@ -78,6 +90,7 @@ const groups = {
   n8n: n8nSchema,
   llm: llmSchema,
   partner: partnerSchema,
+  facebook: facebookSchema,
 } as const;
 
 type Groups = typeof groups;

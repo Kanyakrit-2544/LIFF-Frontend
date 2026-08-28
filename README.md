@@ -42,6 +42,8 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 24 | [S11-M3 — สเปก Match Engine](docs/24-s11-m3-spec.md) | จับคู่ลูกค้า LINE ↔ ประวัติซื้อ, กติกา hash, ขอบเขตที่ LLM เห็นได้ |
 | 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรันจริง + ผลรีวิว (ตรวจ PII ระดับ wire) |
 | 26 | [S11-M3.5 — สัญญาเชื่อมต่อระบบติด Tag](docs/26-purchase-intake-contract.md) | **§A ข้อกำหนดให้ระบบ tag · §B สเปกฝั่งรับ** |
+| 27 | [S11-M3.5 — Implementation Report](docs/27-s11-m35-report.md) | ผลรันจริง + ผลรีวิว (ทดสอบด้วย payload ที่จงใจโกหก) |
+| 28 | [S11-M6 — Facebook Lead Ads](docs/28-s11-m6-facebook-lead.md) | webhook, attribution, consent, ผลรันจริง |
 | 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรัน match engine, fixture 25, privacy tests และข้อจำกัด LLM |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
@@ -71,6 +73,11 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | D20 | ข้อความต้อนรับตอน follow | **ยังไม่ส่ง** — รอ S6 ที่มีปุ่มเปิดฟอร์ม LIFF |
 | D21 | ปลายทาง alert เวลาระบบพัง | **เก็บ log ในระบบ** ยังไม่ต่อช่องทางภายนอก |
 | D22 | ค่าของ `channelId` | ใช้ `destination` จาก LINE webhook body |
+| D31 | webhook ของ Facebook เก็บอะไร | **เก็บแค่ id** — Meta ไม่ส่งข้อมูลลูกค้ามากับ webhook จึงไม่มี PII ใน `inbound_events` |
+| D32 | ไม่มี env ของ Facebook | route ตอบ **404** เหมือนไม่มีอยู่ · ระบบส่วนอื่นทำงานปกติ |
+| D33 | consent จากฟอร์มโฆษณา | **ห้ามสมมติว่ายินยอม** ไม่มีคำถาม consent = ไม่มี consent |
+| D34 | attribution ที่ไม่รู้จัก | เก็บ id ดิบ + `attributionPending` **ห้ามเดาคอร์สจากชื่อแอด** |
+| D35 | ข้อมูลดิบจาก Graph API | **ห้ามเก็บทั้งก้อน** map เป็นฟิลด์ที่ใช้จริงแล้วทิ้ง |
 | D23 | เอา `customer_links` ไปใช้ยังไง | **สถิติรวมเท่านั้น** — โชว์ประวัติซื้อรายบุคคลต้องมีคนกดยืนยันก่อน เพราะเบอร์ที่ผู้ใช้พิมพ์เองไม่ได้ verify (docs/21) |
 | D24 | legacy scrub เดินด้วยอะไร | **สคริปต์** ไม่ใช่ n8n เพราะข้อมูล legacy เป็น batch ที่นิ่ง |
 | D25 | `raw` ของเซลล์คอร์ส | **ห้ามออกจาก `line_crm_legacy`** เพราะอาจมีชื่อคนจริงฝังอยู่ |

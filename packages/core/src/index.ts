@@ -107,3 +107,25 @@ export { reconcilePartnerIdentities, type PartnerReconcileReport } from "./partn
 export { recomputeIntentCurrent, currentIntent, intentRejectionReason } from "./partner/intents";
 export * from "./partner/models";
 export * from "./db/models";
+
+export { verifyMetaSignature } from "./security/metaSignature";
+export {
+  extractLeadgenNotifications,
+  type MetaWebhookBody,
+  type LeadgenNotification,
+  type GraphLead,
+} from "./leads/types";
+export { mapLead, type MappedLead, type LeadConsentField } from "./leads/mapLead";
+export {
+  pickMapping,
+  buildAttribution,
+  loadMappings,
+  upsertLeadMapping,
+  ensureLeadIndexes,
+  LEAD_COLLECTIONS,
+  type LeadFormMappingDoc,
+  type LeadAttribution,
+  type LeadMatchOn,
+} from "./leads/attribution";
+export { fetchLead, facebookConfigured, type FetchLeadResult } from "./leads/fetchLead";
+export { upsertFromLead, type UpsertFromLeadInput, type UpsertFromLeadResult } from "./leads/upsertFromLead";

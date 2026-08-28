@@ -26,6 +26,8 @@
     "cleanup:db-obsolete": "tsx --env-file=apps/web/.env.local scripts/cleanup-obsolete-db.ts",
     "verify:db-users": "tsx scripts/verify-db-users.ts",
     "reset:demo": "tsx --env-file=apps/web/.env.local scripts/reset-demo.ts",
+    "leads:sync": "tsx --env-file=apps/web/.env.local scripts/sync-leads.ts",
+    "smoke:facebook": "tsx --env-file=apps/web/.env.local scripts/smoke-facebook.ts",
     "legacy:profile": "python3 scripts/legacy/profile_xlsx.py \"raw input/Inner.xlsx\" Inner2025 Inner2026",
     "legacy:generate": "tsx --env-file=apps/web/.env.local scripts/generate-legacy-mock.ts",
     "legacy:scrub": "tsx --env-file=apps/web/.env.local scripts/scrub-legacy.ts",
