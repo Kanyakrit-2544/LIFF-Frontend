@@ -67,7 +67,7 @@ const sig = "sha256=" + crypto.createHmac("sha256", PARTNER_SECRET).update(`${ra
     {
       // ── บังคับ ───────────────────────────────────────────────
       "eventId": "tagger-2026-08-28-000123",   // ไม่ซ้ำตลอดกาล ใช้กันข้อมูลซ้ำ (ดู A3)
-      "type": "purchase",                       // purchase | purchase.void | tag
+      "type": "purchase",                       // purchase | purchase.void | intent | tag
       "occurredAt": "2026-08-28T10:15:00Z",     // ISO 8601 มี timezone เสมอ
       "revision": 1,                            // แก้ข้อมูลเดิม = eventId เดิม + revision เพิ่ม
 
@@ -97,8 +97,18 @@ const sig = "sha256=" + crypto.createHmac("sha256", PARTNER_SECRET).update(`${ra
         ]
       },
 
-      // ── ไม่บังคับ แต่ส่งได้จะดีมาก ─────────────────────────────
-      "tags": ["inner-2026-06", "vip"],
+      // ── มีเมื่อ type = intent (ดู A9) ─────────────────────────
+      "intent": {
+        "courseCode": "INNER",                  // null ได้ ถ้าสนใจแบบยังไม่เจาะจงคอร์ส
+        "status": "hesitant",                   // interested | not_interested | hesitant | unknown
+        "hesitationReason": "budget",           // มีเมื่อ status = hesitant
+        "confidence": 0.93,                     // 0–1 จากโมเดล
+        "source": "ai",                         // ai | staff
+        "model": "hermes/gpt-4o-mini@2026-08"   // ระบุรุ่นที่ประเมิน ไว้ย้อนตรวจ
+      },
+
+      // ── ไม่บังคับ ป้ายอิสระสำหรับงานที่ยังไม่มีโครง ─────────────
+      "tags": ["vip"],
       "attribution": {
         "source": "facebook",                   // facebook | instagram | tiktok | line | referral | walkin | other
         "adOrOrganic": "ad",                    // ad | organic | unknown
@@ -172,9 +182,69 @@ const sig = "sha256=" + crypto.createHmac("sha256", PARTNER_SECRET).update(`${ra
 | `refund` | คืนเงิน | ❌ |
 | `merchandise` | หนังสือ/ห้องพัก/ของขาย | ❌ |
 
+## A9. ⭐ Intent — ผลวิเคราะห์ว่าลูกค้าสนใจหรือไม่
+
+ระบบ tag อ่านแชตด้วย AI แล้วสรุปว่าลูกค้า **สนใจ / ไม่สนใจ / ลังเล** และ **ลังเลเพราะอะไร**
+ส่งเข้ามาเป็น `type: "intent"` — **ส่งเฉพาะผลสรุป ห้ามส่งข้อความแชท** (ดู A6)
+
+### ค่าที่รับได้ — รายการปิด ส่งค่าอื่นมาจะถูก quarantine
+
+```text
+status
+├─ interested        สนใจ อยากได้ข้อมูล / กำลังตัดสินใจซื้อ
+├─ not_interested    ปฏิเสธชัดเจน
+├─ hesitant          สนใจแต่ยังไม่ตัดสินใจ
+└─ unknown           อ่านแล้วสรุปไม่ได้
+
+hesitationReason (ส่งเมื่อ status = hesitant)
+├─ budget            งบยังไม่พร้อม / ราคาสูงเกิน
+├─ not_needed        ยังไม่จำเป็นตอนนี้
+├─ timing_conflict   รอบเรียนชนธุระ / ไม่ว่างวันนั้น
+├─ not_ready         ยังไม่พร้อมด้านอื่น (ยังไม่มั่นใจ ยังไม่กล้า)
+├─ needs_approval    ต้องปรึกษาคนอื่นก่อน (คู่สมรส/หัวหน้า)
+└─ unknown           ลังเลแต่ไม่รู้เหตุผล
+```
+
+`timing_conflict` กับ `needs_approval` เพิ่มจากที่เสนอมา เพราะคอร์สมีรอบตายตัว
+"ไม่ว่างรอบนี้" กับ "ไม่มีงบ" เป็นคนละปัญหาและแก้คนละวิธี (อันแรกเสนอรอบถัดไป อันหลังเสนอผ่อน)
+ถ้ายุบรวมเป็น `not_ready` จะเสียข้อมูลที่เอาไปใช้ได้จริง
+
+### กฎของ intent
+
+**1. หนึ่ง event = หนึ่งคอร์ส** สนใจ 2 คอร์สในบทสนทนาเดียว → ส่ง 2 event (`eventId` คนละตัว)
+ห้ามใส่ array ของคอร์สใน event เดียว เพราะแต่ละคอร์สมีสถานะและเหตุผลของตัวเอง
+
+**2. `occurredAt` คือเวลาที่ลูกค้าพูด ไม่ใช่เวลาที่ AI ประมวลผล**
+ถ้าประมวลผลย้อนหลังต้องใส่เวลาจริงของข้อความ ไม่งั้น timeline เพี้ยนทั้งระบบ
+
+**3. ⭐ ความสนใจเปลี่ยนได้ — เราเก็บเป็นประวัติ ไม่ทับของเก่า**
+ประเมินใหม่เมื่อไรให้ส่ง **`eventId` ใหม่** ทุกครั้ง
+`revision` ใช้เฉพาะตอน **แก้ผลที่ส่งผิด** ไม่ใช่ตอนลูกค้าเปลี่ยนใจ
+
+เหตุผล: ต้องตอบคำถามอย่าง *"คนที่เคยลังเลเพราะงบ สุดท้ายซื้อกี่คน"* ให้ได้
+ถ้าทับของเก่า คำถามนี้จะตอบไม่ได้ตลอดกาล และนี่คือคำถามที่มีค่าที่สุดของการเก็บ intent
+
+**4. `confidence` ต่ำกว่า 0.6 → เราเก็บไว้แต่ไม่นับในสถิติ** ส่งมาตามจริง อย่าปัดขึ้นให้ดูดี
+
+**5. ห้ามส่ง `purchased` / `repeat_customer` เป็น intent หรือ tag**
+ตรงกับที่ทีม tag เสนอ — CRM ตัดสินจาก `purchase` จริง ซึ่งเชื่อถือได้กว่าการอ่านแชท
+
+**6. `source: "staff"` ชนะ `source: "ai"` เสมอ**
+เจ้าหน้าที่แก้ผลที่ AI ประเมินผิด → ส่ง intent ใหม่ `source: "staff"` ระบบถือว่าจริงกว่า และ AI ทับไม่ได้อีก
+
+**7. ต้องส่ง `model` ทุกครั้ง**
+วันที่เปลี่ยนโมเดลแล้วตัวเลข "คนสนใจ" กระโดด เราต้องแยกออกว่าเพราะโมเดลเปลี่ยนหรือลูกค้าเปลี่ยนจริง
+
+**8. ตัวเลขจาก intent เป็น "ค่าประเมิน" ไม่ใช่ข้อเท็จจริง**
+ทุกรายงานที่ใช้ intent จะถูกกำกับว่ามาจากการประเมินของ AI พร้อมบอกรุ่นโมเดลและช่วง confidence
+ต่างจากยอดขายที่เป็นข้อเท็จจริง — ห้ามเอาสองอย่างนี้ไปวางในตารางเดียวกันโดยไม่แยกป้าย
+
 ## A6. ❌ ห้ามส่งข้อมูลเหล่านี้
 
-- บทสนทนากับลูกค้า ข้อความแชท รูปภาพ ไฟล์แนบ
+- **บทสนทนากับลูกค้า ข้อความแชท รูปภาพ ไฟล์แนบ** — เด็ดขาด (D4: ระบบนี้ไม่เก็บบทสนทนา redact ตั้งแต่ webhook)
+- **ข้อความที่อ้างอิงจากแชทในทุกรูปแบบ** — ห้ามมี field `quote`, `evidence`, `snippet`, `summary` ที่มีคำพูดลูกค้า
+  แม้แต่ใน `tags` ก็ห้ามใส่ข้อความอิสระที่ลอกมาจากสิ่งที่ลูกค้าพิมพ์
+  อยากบอกว่าทำไม AI สรุปแบบนั้น → ส่ง `confidence` อย่างเดียวพอ
 - เลขบัตรประชาชน เลขพาสปอร์ต เลขบัตรเครดิต ข้อมูลสุขภาพ
 - ที่อยู่เต็ม (ถ้าจำเป็นต้องมีค่อยคุยกันเพิ่ม ตอนนี้ไม่ต้อง)
 - `customerId` ของระบบ LINE CRM — เราเป็นคนกำหนดเอง ห้ามส่งมาบอกว่าเป็นใคร
@@ -234,10 +304,11 @@ const sig = "sha256=" + crypto.createHmac("sha256", PARTNER_SECRET).update(`${ra
 1. `POST /api/partner/intake` + ตรวจ HMAC ด้วย secret แยกต่อ partner
 2. `partner_events` — เก็บ event ดิบ + กันซ้ำด้วย unique index
 3. `purchases` + `purchase_items` ใน `line_crm_dev` — โครงเดียวกับ `legacy_payments` / `legacy_enrollments` เพื่อให้ analytics รวมสองแหล่งได้ด้วย query เดียว
-4. `partner_quarantine` — event ที่แปลงไม่ได้
-5. ผูกเข้ากับลูกค้า: `lineUserId` → `identities` · ไม่มีก็ใช้ phone/email แบบมีเงื่อนไข (B4)
-6. scrub เข้า `line_crm_ai` แบบเดียวกับ legacy (ใช้ `ai/tokens.ts` เดิม)
-7. tests
+4. `customer_intents` — ผลประเมินความสนใจแบบ append-only (A9)
+5. `partner_quarantine` — event ที่แปลงไม่ได้
+6. ผูกเข้ากับลูกค้า: `lineUserId` → `identities` · ไม่มีก็ใช้ phone/email แบบมีเงื่อนไข (B4)
+7. scrub เข้า `line_crm_ai` แบบเดียวกับ legacy (ใช้ `ai/tokens.ts` เดิม)
+8. tests
 
 ## B2. ❌ ไม่อยู่ในสโคป
 - ไม่ทำหน้าจอให้เจ้าหน้าที่จัดการ quarantine (แค่เก็บข้อมูลไว้ให้ครบ)
@@ -253,7 +324,7 @@ export interface PartnerEventDoc {
   partnerId: string;
   eventId: string;             // ของ partner
   revision: number;
-  type: "purchase" | "purchase.void" | "tag";
+  type: "purchase" | "purchase.void" | "intent" | "tag";
   occurredAt: Date;
   receivedAt: Date;
   status: "accepted" | "quarantined" | "pending_identity" | "voided";
@@ -283,6 +354,27 @@ export interface PurchaseDoc {          // เงิน — โครงเด�
   createdAt: Date; updatedAt: Date; schemaVersion: number;
 }
 
+export interface CustomerIntentDoc {    // ผลประเมินความสนใจ — append-only ห้ามทับ
+  _id: string;                          // int_<ULID>
+  customerId: string | null;
+  courseCode: string | null;            // null = สนใจแบบยังไม่เจาะจงคอร์ส
+  status: "interested" | "not_interested" | "hesitant" | "unknown";
+  hesitationReason: "budget" | "not_needed" | "timing_conflict" | "not_ready" | "needs_approval" | "unknown" | null;
+  confidence: number;                   // 0–1
+  /** ต่ำกว่าเกณฑ์ = เก็บไว้แต่ไม่นับในสถิติ */
+  belowThreshold: boolean;
+  source: "ai" | "staff";
+  model: string | null;                 // null ได้เมื่อ source = staff
+  /** เวลาที่ลูกค้าพูด ไม่ใช่เวลาที่ AI ประมวลผล */
+  observedAt: Date;
+  /** มีค่าเมื่อมี intent ใหม่ของ (customerId, courseCode) เดียวกันมาแทน */
+  supersededAt: Date | null;
+  partnerId: string;
+  sourceEventId: string;
+  aiSync: { dirty: boolean; syncedAt: Date | null; lockedAt: Date | null; attempts: number; claimId?: string };
+  createdAt: Date; schemaVersion: number;
+}
+
 export interface PurchaseItemDoc {      // ที่นั่ง — โครงเดียวกับ LegacyEnrollmentDoc
   _id: string;                          // pit_<ULID>
   purchaseId: string;
@@ -302,6 +394,7 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 - `partner_events`: `ux_partnerEvent {partnerId:1, eventId:1}` **unique** ← หัวใจของการกันซ้ำ
 - `purchases`: `ix_customer {customerId:1}` · `ix_paidAt {paidAt:1}` · `ix_yearMonth {year:1,month:1}` · `ix_aiSyncQueue`
 - `purchase_items`: `ix_purchase {purchaseId:1}` · `ix_courseSession {courseCode:1,sessionStart:1,countsAsSeat:1}`
+- `customer_intents`: `ix_current {customerId:1, courseCode:1, supersededAt:1}` · `ix_observed {observedAt:1}` · `ix_funnel {status:1, hesitationReason:1, observedAt:1}` · `ix_aiSyncQueue`
 
 ## B4. ⭐ กฎการระบุตัวลูกค้า
 
@@ -322,6 +415,18 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 - `purchase.void` → ตั้ง `status: "voided"` ไม่ลบ record และไม่นับในสถิติ
 - `revision` น้อยกว่าหรือเท่าที่มีอยู่ → ตอบ `duplicate` ไม่เขียนทับ
 
+### กฎเฉพาะของ intent
+
+- **append-only** — intent ใหม่ของ `(customerId, courseCode)` เดิม ไม่ลบของเก่า แค่ตั้ง `supersededAt` ให้ตัวก่อนหน้า
+  "ตัวปัจจุบัน" = แถวที่ `supersededAt: null`
+- `confidence < 0.6` → `belowThreshold: true` เก็บไว้แต่ analytics ต้องกรองออกโดยปริยาย
+- intent ที่ `source: "ai"` **ห้ามทับ** intent ที่ `source: "staff"` ของคู่เดียวกันที่ยังไม่ถูก supersede
+  (staff ทับ staff ได้ · staff ทับ ai ได้ · ai ทับ ai ได้ · ai ทับ staff **ไม่ได้** → ตอบ `rejected` พร้อมเหตุผล)
+- **ข้อเท็จจริงจากการซื้อชนะค่าประเมินเสมอ** — ถ้ามี `purchase` ของคอร์สนั้น อย่านำ `not_interested`/`hesitant`
+  ของคอร์สเดียวกันไปใช้ตอบว่า "ไม่สนใจ" ให้ถือว่า intent นั้นเป็นประวัติก่อนซื้อเท่านั้น
+- `status`/`hesitationReason` ที่ไม่อยู่ในรายการปิด → **quarantine ทั้ง event** ห้ามแปลงเป็น `unknown` เงียบ ๆ
+  (ถ้าแปลงเงียบ วันที่ทีม tag เพิ่มค่าใหม่แล้วลืมบอก เราจะไม่มีวันรู้)
+
 ## B6. Tests
 
 **Unit**
@@ -334,6 +439,12 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 - body > 1MB หรือ events > 100 → 400
 - `purchase.void` → purchase เดิมเป็น `voided` และไม่ถูกนับ
 - `revision` ต่ำกว่าเดิม → ไม่เขียนทับ
+- ⭐ intent ใหม่ของคู่เดิม → ตัวเก่าได้ `supersededAt` ไม่ถูกลบ และยัง query ประวัติได้
+- ⭐ `source: "ai"` ทับ `source: "staff"` → `rejected` ไม่เขียนทับ
+- `confidence: 0.4` → `belowThreshold: true`
+- `status: "maybe"` (ค่านอกรายการ) → `quarantined` ไม่ใช่แปลงเป็น `unknown`
+- event ที่มี field `quote` / `evidence` / `snippet` → `rejected` (กัน D4 หลุด)
+- intent ที่มี `hesitationReason` แต่ `status != "hesitant"` → `rejected`
 
 **Integration** (`RUN_MONGO_INTEGRATION=true`)
 - ยิง 100 event พร้อมกัน 2 รอบ → purchase เท่าเดิม (unique index ทำงาน)
@@ -348,6 +459,8 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 - [ ] ยิง event เดิมซ้ำ 10 ครั้ง → purchase 1 รายการ
 - [ ] ยอดรวมจาก `purchases` เท่ากับผลรวม `amount` ที่ส่งเข้ามา (ไม่เบิ้ล)
 - [ ] event ที่ courseLabel ไม่รู้จัก อยู่ใน quarantine ครบ ไม่หายเงียบ
+- [ ] ส่ง intent 3 รอบให้คนเดิมคอร์สเดิม → มี 3 แถว ตัวปัจจุบัน 1 แถว ประวัติครบ
+- [ ] ไม่มี field ใดใน `customer_intents` ที่มีข้อความจากแชทลูกค้า
 - [ ] เขียน `docs/27-s11-m35-report.md` พร้อมผลรันจริงจาก terminal
 
 ## B8. กฎที่ห้ามละเมิด
@@ -357,7 +470,10 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 4. ห้ามเก็บเงินไว้ที่ `purchase_items`
 5. ห้าม log payload ที่มี PII — `logger.ts` redact อยู่แล้ว อย่าปิด
 6. ห้ามใช้ `INTERNAL_HMAC_SECRET` ตัวเดียวกับ n8n
-7. business logic อยู่ใน `packages/core`
+7. **ห้ามรับ field ที่มีข้อความจากแชท** (`quote`/`evidence`/`snippet`/`summary`) — ปฏิเสธทั้ง event (D4)
+8. **ห้ามทับ intent เก่า** — append-only เท่านั้น ไม่งั้นตอบคำถาม funnel ไม่ได้ตลอดกาล
+9. **ห้ามให้ค่าประเมินจาก AI ปนกับข้อเท็จจริงจากการซื้อโดยไม่แยกป้าย**
+10. business logic อยู่ใน `packages/core`
 
 ---
 
@@ -371,3 +487,9 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 4. ใครติด tag (เซล/ระบบอัตโนมัติ) และติดตอนไหนเทียบกับเวลาจ่ายเงิน
 5. แก้ย้อนหลัง/ยกเลิกได้ไหม และระบบรู้ตัวไหมว่าแก้อะไรไป
 6. คาดว่าส่งกี่ event ต่อวัน (มีผลกับการตั้ง rate limit)
+7. **AI ประเมิน intent ตอนไหน** — ทุกข้อความ / ทุกครั้งที่จบบทสนทนา / วันละครั้ง
+   มีผลกับจำนวน event และกับการอ่านผล (ประเมินทุกข้อความจะเห็นความสนใจแกว่งไปมา)
+8. **โมเดลที่ใช้ประเมิน intent เป็นตัวไหน และข้อความลูกค้าออกนอกองค์กรไหม**
+   ถ้าใช้ ChatGPT ผ่าน Hermes = บทสนทนาลูกค้าออกไปที่ผู้ให้บริการภายนอก
+   ฝั่งเราไม่ได้ห้าม (เป็นระบบคนละตัว) แต่ต้องรู้ไว้เพราะกระทบ PDPA และ consent ที่ลูกค้าเซ็น
+9. **วัดความแม่นของ AI ยังไง** — มีชุดที่คนตรวจแล้วเทียบไหม ถ้าไม่มี ตัวเลข "คนสนใจ 50 คน" จะไม่มีใครรู้ว่าเชื่อได้แค่ไหน
