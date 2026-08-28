@@ -29,6 +29,16 @@ export interface ScrubbedCustomer {
   firstInteractionAt: string | null;
   firstMessageAt: string | null;
   formSubmittedAt: string | null;
+  /**
+   * ที่มาจากโฆษณา (docs/28) — ส่งเฉพาะที่ analytics ใช้จริง
+   * ไม่ส่ง pageId/formId/adId เพราะเป็น id ของแพลตฟอร์ม ไม่จำเป็นต่อการวิเคราะห์
+   */
+  leadAttribution: {
+    courseCode: string | null;
+    campaignName: string | null;
+    adOrOrganic: "ad" | "organic" | "unknown";
+    attributionPending: boolean;
+  } | null;
   syncedAt: string;
   sourceUpdatedAt: string | null;
 }
@@ -61,6 +71,14 @@ export function scrubCustomer(c: CustomerDoc, now = new Date()): ScrubbedCustome
     firstInteractionAt: date(c.firstInteractionAt),
     firstMessageAt: date(c.firstMessageAt ?? null),
     formSubmittedAt: date(c.profileRef?.updatedAt ?? null),
+    leadAttribution: c.leadAttribution
+      ? {
+          courseCode: c.leadAttribution.courseCode,
+          campaignName: c.leadAttribution.campaignName,
+          adOrOrganic: c.leadAttribution.adOrOrganic,
+          attributionPending: c.leadAttribution.attributionPending,
+        }
+      : null,
     syncedAt: now.toISOString(),
     sourceUpdatedAt: iso(c.updatedAt),
   };

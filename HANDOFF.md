@@ -73,7 +73,7 @@ Codex รายงาน "ผ่าน" มาหลายรอบทั้ง�
 
 ## สถานะปัจจุบัน
 
-**เสร็จแล้ว** S1–S10 + S11-M1/M2/M3 · 258 tests ผ่าน (core 208 · web 50) skipped 0 · typecheck ผ่าน · match fixture 25/verify ผ่านบน Mongo local
+**เสร็จแล้ว** S1–S10 + S11 ครบทุกขั้น (M1–M6) · 356 tests ผ่าน (core 292 · web 64) skipped 0 · typecheck ผ่านทั้ง 3 ชุด
 
 **WF-D เคลียร์แล้ว (2026-08-28)** — import เวอร์ชันใหม่ที่มี `title`/`nameKeys`/`nicknameKey`
 เทคนิค: ใส่ `id` ของ MongoDB credential ลงในไฟล์ JSON **ก่อน** import → credential ไม่หลุด ไม่ต้องผูกใหม่ใน UI
@@ -105,6 +105,8 @@ execution ที่สำเร็จจะไม่ถูกบันทึก 
 | **ย้าย n8n ไป VPS องค์กร** | สูงสุด — ปิดเครื่อง = ชีตกับ AI mirror หยุด (ข้อมูลไม่หาย ค้าง `dirty` รอ) |
 | กรอก `TODO` ใน `apps/web/app/privacy/page.tsx` | สูง — ชื่อธุรกิจ + อีเมลติดต่อ |
 | ต่อ WF-E เข้า LINE กลุ่ม (ตอนนี้ error ลง `audit_logs` เฉย ๆ) | กลาง |
+| ตั้ง `LLM_BASE_URL` ชี้ Hermes แล้วลอง `npm run insights:ask -- --question "..."` | กลาง — ชั้น aggregation ใช้ได้แล้วด้วย `--query` |
+| ขอ token Facebook Lead (ดู `docs/28` §10) | กลาง — โค้ดพร้อม ใส่ token แล้วรันได้เลย |
 | หน้าให้พนักงานกด merge (`pendingMerge`) | กลาง |
 | ลบ collection `__p` (ขยะจากสคริปต์ทดสอบ) | ต่ำ |
 | Presidio scrub จริง | ต่ำ — รอตอนเพิ่มคำถามปลายเปิด |

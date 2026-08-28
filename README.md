@@ -45,6 +45,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 27 | [S11-M3.5 — Implementation Report](docs/27-s11-m35-report.md) | ผลรันจริง + ผลรีวิว (ทดสอบด้วย payload ที่จงใจโกหก) |
 | 28 | [S11-M6 — Facebook Lead Ads](docs/28-s11-m6-facebook-lead.md) | webhook, attribution, consent, ผลรันจริง |
 | 29 | [S11-M4 — สเปก Analytics + insights](docs/29-s11-m4-analytics.md) | สูตรที่ถูกต้อง, ขอบเขตของ LLM, ตัวกันโกหก |
+| 30 | [S11-M4 — Implementation Report](docs/30-s11-m4-report.md) | ผลรันจริง + ตัวเลขที่ cross-check กับ M1 |
 | 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรัน match engine, fixture 25, privacy tests และข้อจำกัด LLM |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 

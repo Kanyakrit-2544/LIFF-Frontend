@@ -20,6 +20,7 @@ const PREFIX = {
   legacyPayment: "lgy",
   legacyEnrollment: "lge",
   leadMapping: "lfm",
+  insight: "ins",
   link: "lnk",
   partnerEvent: "pev",
   purchase: "pur",

@@ -129,3 +129,20 @@ export {
 } from "./leads/attribution";
 export { fetchLead, facebookConfigured, type FetchLeadResult } from "./leads/fetchLead";
 export { upsertFromLead, type UpsertFromLeadInput, type UpsertFromLeadResult } from "./leads/upsertFromLead";
+
+export {
+  analyticsQuerySchema,
+  bangkokRange,
+  previousRange,
+  bangkokKey,
+  withDerived,
+  METRICS,
+  GROUP_BY,
+  type AnalyticsQuery,
+  type AnalyticsResult,
+  type AnalyticsRow,
+} from "./analytics/query";
+export { runAnalytics } from "./analytics/aggregate";
+export { verifyAnswerNumbers, type VerifyResult as AnswerVerifyResult } from "./analytics/verify";
+export { parseQuestion, renderAnswer, PROMPT_VERSION, type ParseOutcome, type RenderOutcome } from "./analytics/ask";
+export { saveInsight, ensureInsightIndexes, type InsightDoc } from "./analytics/insights";

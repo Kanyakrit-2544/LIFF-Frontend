@@ -25,6 +25,7 @@ export const AI_COLLECTIONS = {
   purchasesScrubbed: "purchases_scrubbed",
   purchaseItemsScrubbed: "purchase_items_scrubbed",
   customerIntentsScrubbed: "customer_intents_scrubbed",
+  insights: "insights",
 } as const;
 
 export type IdentityProvider =
