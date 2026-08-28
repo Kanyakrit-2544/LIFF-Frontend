@@ -53,6 +53,13 @@ export interface LegacyPersonDoc {
   createdAt: Date;
   updatedAt: Date;
   schemaVersion: number;
+  aiSync: {
+    dirty: boolean;
+    syncedAt: Date | null;
+    lockedAt: Date | null;
+    attempts: number;
+    claimId?: string;
+  };
 }
 
 export interface LegacyPaymentDoc {
@@ -69,7 +76,15 @@ export interface LegacyPaymentDoc {
   synthetic: boolean;
   importRunId: string;
   createdAt: Date;
+  updatedAt: Date;
   schemaVersion: number;
+  aiSync: {
+    dirty: boolean;
+    syncedAt: Date | null;
+    lockedAt: Date | null;
+    attempts: number;
+    claimId?: string;
+  };
 }
 
 export interface LegacyEnrollmentDoc {
@@ -94,7 +109,15 @@ export interface LegacyEnrollmentDoc {
   synthetic: boolean;
   importRunId: string;
   createdAt: Date;
+  updatedAt: Date;
   schemaVersion: number;
+  aiSync: {
+    dirty: boolean;
+    syncedAt: Date | null;
+    lockedAt: Date | null;
+    attempts: number;
+    claimId?: string;
+  };
 }
 
 export interface LegacyImportRunDoc {

@@ -11,18 +11,21 @@ export const LEGACY_INDEXES: Record<string, { name: string; key: Record<string, 
     { name: "ix_email", key: { email: 1 }, sparse: true },
     { name: "ix_importRun", key: { importRunId: 1 } },
     { name: "ix_lastPaid", key: { lastPaidAt: -1 } },
+    { name: "ix_aiSyncQueue", key: { "aiSync.dirty": 1, "aiSync.lockedAt": 1 } },
   ],
   [LEGACY_COLLECTIONS.payments]: [
     { name: "ix_person", key: { personId: 1 } },
     { name: "ix_paidAt", key: { paidAt: 1 } },
     { name: "ix_slip", key: { slipNo: 1 } },
     { name: "ix_yearRep", key: { year: 1, saleRep: 1 } },
+    { name: "ix_aiSyncQueue", key: { "aiSync.dirty": 1, "aiSync.lockedAt": 1 } },
   ],
   [LEGACY_COLLECTIONS.enrollments]: [
     { name: "ix_person", key: { personId: 1 } },
     { name: "ix_payment", key: { paymentId: 1 } },
     // คำถามหลัก: คอร์สนี้ในช่วงเวลานี้ ขายได้กี่ที่นั่ง
     { name: "ix_courseSession", key: { courseCode: 1, sessionStart: 1, countsAsSeat: 1 } },
+    { name: "ix_aiSyncQueue", key: { "aiSync.dirty": 1, "aiSync.lockedAt": 1 } },
   ],
   [LEGACY_COLLECTIONS.importRuns]: [{ name: "ix_startedAt", key: { startedAt: -1 } }],
 };

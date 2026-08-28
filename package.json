@@ -8,7 +8,9 @@
   ],
   "scripts": {
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck:workspaces && npm run typecheck:scripts",
+    "typecheck:workspaces": "npm run typecheck --workspaces --if-present",
+    "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "create-indexes": "tsx --env-file=apps/web/.env.local scripts/create-indexes.ts",
     "check-env": "tsx --env-file=apps/web/.env.local scripts/check-env.ts",
     "db:test:up": "docker run -d --name line-crm-mongo -p 27018:27017 mongo:7 --replSet rs0 --bind_ip_all && sleep 4 && docker exec line-crm-mongo mongosh --quiet --eval \"rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]})\"",
@@ -25,7 +27,8 @@
     "verify:db-users": "tsx scripts/verify-db-users.ts",
     "reset:demo": "tsx --env-file=apps/web/.env.local scripts/reset-demo.ts",
     "legacy:profile": "python3 scripts/legacy/profile_xlsx.py \"raw input/Inner.xlsx\" Inner2025 Inner2026",
-    "legacy:generate": "tsx --env-file=apps/web/.env.local scripts/generate-legacy-mock.ts"
+    "legacy:generate": "tsx --env-file=apps/web/.env.local scripts/generate-legacy-mock.ts",
+    "legacy:scrub": "tsx --env-file=apps/web/.env.local scripts/scrub-legacy.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

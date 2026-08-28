@@ -1,14 +1,9 @@
 import type { CustomerDoc, RecordStatus } from "../db/models";
-import { maskEmail, maskPhone, hashValue } from "../security/pii";
+import { maskEmail, maskPhone } from "../security/pii";
+import { emailHash, personToken, phoneHash } from "./tokens";
 
 const date = (v: Date | null | undefined) => (v ? v.toISOString().slice(0, 10) : null);
 const iso = (v: Date | null | undefined) => (v ? v.toISOString() : null);
-
-function personToken(value: string | null | undefined): string | null {
-  const normalized = value?.trim().replace(/\s+/g, " ");
-  if (!normalized) return null;
-  return `<PERSON_${hashValue(`PERSON|${normalized.toLocaleLowerCase("th-TH")}`).slice(0, 8)}>`;
-}
 
 export interface ScrubbedCustomer {
   _id: string;
@@ -51,8 +46,8 @@ export function scrubCustomer(c: CustomerDoc, now = new Date()): ScrubbedCustome
     fullNameEn: personToken(c.fullNameEn),
     phone: phone ? maskPhone(phone) : null,
     email: email ? maskEmail(email) : null,
-    phoneHash: phone ? hashValue(`PHONE|${phone}`) : null,
-    emailHash: email ? hashValue(`EMAIL|${email.toLowerCase()}`) : null,
+    phoneHash: phoneHash(phone),
+    emailHash: emailHash(email),
     birthYear: c.birthYear ?? null,
     province: null,
     customerStatus: c.customerStatus,

@@ -16,6 +16,26 @@ export {
   maskPhone,
   maskEmail,
 } from "./security/pii";
+export { personToken, phoneHash, emailHash, ageBand, slipGroupId } from "./ai/tokens";
+export {
+  scrubLegacyPerson,
+  scrubLegacyPayment,
+  scrubLegacyEnrollment,
+  safeSessionLabel,
+  type ScrubbedLegacyPerson,
+  type ScrubbedLegacyPayment,
+  type ScrubbedLegacyEnrollment,
+} from "./ai/scrubLegacy";
+export { ensureAiIndexes, verifyAiIndexes, AI_INDEX_SPECS } from "./ai/indexes";
+export {
+  claimLegacyAiSync,
+  ackLegacyAiSync,
+  LEGACY_AI_LEASE_MS,
+  LEGACY_AI_MAX_ATTEMPTS,
+  type LegacyAiPendingRow,
+  type LegacyAiAckItem,
+} from "./legacy/aiQueue";
+export { legacyMirrorCountsOk, type LegacyMirrorCount } from "./legacy/verify";
 
 export { getClient, getDb, closeClient, pingDb } from "./db/client";
 export { ensureIndexes, verifyIndexes, INDEX_SPECS, type EnsureResult } from "./db/indexes";

@@ -71,6 +71,11 @@ describe("generateLegacy — ความถูกต้องของโคร
     for (const p of phones) expect(normalizePhone(p)).toBe(p);
   });
 
+  it("⭐ ต้องเป็นเบอร์มือถือไทยจริง (+66 + 9 หลัก ขึ้นต้น 6/8/9) ไม่ใช่ความยาวเบอร์บ้าน", () => {
+    const phones = data.persons.map((p) => p.phone).filter((p): p is string => p !== null);
+    for (const p of phones) expect(p, p).toMatch(/^\+66[689]\d{8}$/);
+  });
+
   it("ทุก doc ติดธง synthetic — กันคนหยิบตัวเลขไปใช้จริง", () => {
     expect(data.persons.every((p) => p.synthetic)).toBe(true);
     expect(data.payments.every((p) => p.synthetic)).toBe(true);

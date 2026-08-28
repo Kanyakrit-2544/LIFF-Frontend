@@ -13,6 +13,9 @@ export const COLLECTIONS = {
 
 export const AI_COLLECTIONS = {
   customersScrubbed: "customers_scrubbed",
+  legacyPersonsScrubbed: "legacy_persons_scrubbed",
+  legacyPaymentsScrubbed: "legacy_payments_scrubbed",
+  legacyEnrollmentsScrubbed: "legacy_enrollments_scrubbed",
 } as const;
 
 export type IdentityProvider =

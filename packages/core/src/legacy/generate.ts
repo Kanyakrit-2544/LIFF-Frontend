@@ -138,7 +138,8 @@ function generateSheet(
     let phone: string | null = null;
     if (rnd() < fill("phone")) {
       for (let tries = 0; tries < 20 && !phone; tries++) {
-        const candidate = normalizePhone(`0${[6, 8, 9][int(rnd, 0, 2)]}${String(int(rnd, 0, 9999999)).padStart(7, "0")}`);
+        // มือถือไทย = 0 + (6|8|9) + อีก 8 หลัก รวม 10 ตัว
+        const candidate = normalizePhone(`0${[6, 8, 9][int(rnd, 0, 2)]}${String(int(rnd, 0, 99999999)).padStart(8, "0")}`);
         if (candidate && !ctx.usedPhones.has(candidate)) phone = candidate;
       }
       if (phone) ctx.usedPhones.add(phone);
@@ -169,6 +170,7 @@ function generateSheet(
       createdAt: ctx.now,
       updatedAt: ctx.now,
       schemaVersion: LEGACY_SCHEMA_VERSION,
+      aiSync: { dirty: true, syncedAt: null, lockedAt: null, attempts: 0 },
     };
 
     for (let i = 0; i < payCount; i++) {
@@ -192,7 +194,9 @@ function generateSheet(
         synthetic: true,
         importRunId: ctx.importRunId,
         createdAt: ctx.now,
+        updatedAt: ctx.now,
         schemaVersion: LEGACY_SCHEMA_VERSION,
+        aiSync: { dirty: true, syncedAt: null, lockedAt: null, attempts: 0 },
       };
       out.payments.push(payment);
 
@@ -231,7 +235,9 @@ function generateSheet(
           synthetic: true,
           importRunId: ctx.importRunId,
           createdAt: ctx.now,
+          updatedAt: ctx.now,
           schemaVersion: LEGACY_SCHEMA_VERSION,
+          aiSync: { dirty: true, syncedAt: null, lockedAt: null, attempts: 0 },
         });
 
         if (parsed.countsAsSeat) {

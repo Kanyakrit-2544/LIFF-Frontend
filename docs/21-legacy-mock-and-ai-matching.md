@@ -118,7 +118,7 @@ npm run typecheck  ผ่านทั้ง core และ web
 
 | ขั้น | งาน |
 |---|---|
-| M2 | scrub legacy → `line_crm_ai.legacy_persons_scrubbed` ด้วย `AI_HASH_PEPPER` ตัวเดิม (ต่างชุด = join ไม่ติด) |
+| M2 | ✅ scrub legacy → `line_crm_ai` ด้วย `AI_HASH_PEPPER` ตัวเดิม (ต่างชุด = join ไม่ติด) — ดู [docs/22](22-s11-m2-spec.md) และ [รายงานผล](23-s11-m2-report.md) |
 | M3 | match engine: `phoneHash`/`emailHash` ตรง = auto · ไม่ตรง = LLM เสนอ → `needs_review` เสมอ |
 | M4 | analytics + `insights` collection + ชั้นแปลงคำถามภาษาไทยเป็นพารามิเตอร์ |
 | M5 | restore token → ค่าจริง ที่ app เท่านั้น |

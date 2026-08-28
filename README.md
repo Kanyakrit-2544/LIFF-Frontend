@@ -37,6 +37,8 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 19 | [S8 — Google Sheets Sync](docs/19-s8-sheets-sync.md) | นิยามคอลัมน์, คิวซิงก์, WF-C, ผลทดสอบจริง |
 | 20 | [S9 — Plaintext DB + AI Mirror](docs/20-s9-plaintext-ai-mirror.md) | plaintext phone/email, scrubbed AI DB, WF-D, ผลทดสอบจริง |
 | 21 | [S11 — ฐาน legacy (mock) + จับคู่ด้วย AI](docs/21-legacy-mock-and-ai-matching.md) | ข้อมูล synthetic จากสถิติชีตขาย, โครง persons/payments/enrollments, กติกาให้ LLM |
+| 22 | [S11-M2 — สเปก scrub legacy](docs/22-s11-m2-spec.md) | scrub deterministic เข้า AI DB, queue, index, verify |
+| 23 | [S11-M2 — Implementation Report](docs/23-s11-m2-report.md) | ผลรันจริง: scrub/verify/idempotency + hash parity |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
 ## Design Decisions (ยืนยันแล้ว)
@@ -66,6 +68,10 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | D21 | ปลายทาง alert เวลาระบบพัง | **เก็บ log ในระบบ** ยังไม่ต่อช่องทางภายนอก |
 | D22 | ค่าของ `channelId` | ใช้ `destination` จาก LINE webhook body |
 | D23 | เอา `customer_links` ไปใช้ยังไง | **สถิติรวมเท่านั้น** — โชว์ประวัติซื้อรายบุคคลต้องมีคนกดยืนยันก่อน เพราะเบอร์ที่ผู้ใช้พิมพ์เองไม่ได้ verify (docs/21) |
+| D24 | legacy scrub เดินด้วยอะไร | **สคริปต์** ไม่ใช่ n8n เพราะข้อมูล legacy เป็น batch ที่นิ่ง |
+| D25 | `raw` ของเซลล์คอร์ส | **ห้ามออกจาก `line_crm_legacy`** เพราะอาจมีชื่อคนจริงฝังอยู่ |
+| D26 | อายุใน AI DB | ส่งเป็นช่วง 10 ปี (`ageBand`) ไม่ส่งอายุเต็ม |
+| D27 | เลขสลิปใน AI DB | ส่ง `slipGroupId` แบบ hash 12 ตัวแทนเลขสลิปจริง |
 
 ## สถานะ
 
@@ -82,6 +88,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 - [x] **S6+S7 — หน้า LIFF + รับข้อมูลเข้าระบบ + merge** ✅ 159 tests ผ่าน
 - [x] **S8 — Google Sheets sync + WF-C** ✅ 175 tests ผ่าน
 - [x] **S9 — Plaintext DB + AI Mirror + WF-D** ✅ 178 integration tests ผ่านบน Atlas dev
+- [x] **S11-M2 — Scrub legacy เข้า AI mirror** ✅ integration + verify ผ่านบน Mongo local
 - [ ] Phase 5 — Implementation (S10 → S11)
 - [ ] Phase 6 — Testing
 

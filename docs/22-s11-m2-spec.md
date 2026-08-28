@@ -187,6 +187,7 @@ npm run legacy:scrub -- --legacy-uri "<uri>" --ai-uri "<uri>"      # sync เฉ
 npm run legacy:scrub -- --all                                       # ตั้ง dirty ใหม่ทั้งหมดแล้ว sync
 npm run legacy:scrub -- --verify                                    # ไม่เขียนอะไร รายงานอย่างเดียว
 npm run legacy:scrub -- --batch 500
+npm run legacy:scrub -- --prune                                     # ลบของกำพร้าฝั่ง AI ที่ต้นทางไม่มีแล้ว
 ```
 
 - `--legacy-uri` ← `LEGACY_MONGODB_URI` · `--ai-uri` ← `MONGODB_MIRROR_URI`
