@@ -67,7 +67,7 @@ const sig = "sha256=" + crypto.createHmac("sha256", PARTNER_SECRET).update(`${ra
     {
       // ── บังคับ ───────────────────────────────────────────────
       "eventId": "tagger-2026-08-28-000123",   // ไม่ซ้ำตลอดกาล ใช้กันข้อมูลซ้ำ (ดู A3)
-      "type": "purchase",                       // purchase | purchase.void | intent | tag
+      "type": "purchase",                       // purchase | purchase.void | intent | intent.void
       "occurredAt": "2026-08-28T10:15:00Z",     // ISO 8601 มี timezone เสมอ
       "revision": 1,                            // แก้ข้อมูลเดิม = eventId เดิม + revision เพิ่ม
 
@@ -107,8 +107,7 @@ const sig = "sha256=" + crypto.createHmac("sha256", PARTNER_SECRET).update(`${ra
         "model": "hermes/gpt-4o-mini@2026-08"   // ระบุรุ่นที่ประเมิน ไว้ย้อนตรวจ
       },
 
-      // ── ไม่บังคับ ป้ายอิสระสำหรับงานที่ยังไม่มีโครง ─────────────
-      "tags": ["vip"],
+      // ⚠️ `tags` และ `type: "tag"` ยังไม่รองรับใน M3.5 (ดู A10) ส่งมาได้แต่จะถูกพักไว้
       "attribution": {
         "source": "facebook",                   // facebook | instagram | tiktok | line | referral | walkin | other
         "adOrOrganic": "ad",                    // ad | organic | unknown
@@ -216,6 +215,10 @@ hesitationReason (ส่งเมื่อ status = hesitant)
 
 **2. `occurredAt` คือเวลาที่ลูกค้าพูด ไม่ใช่เวลาที่ AI ประมวลผล**
 ถ้าประมวลผลย้อนหลังต้องใส่เวลาจริงของข้อความ ไม่งั้น timeline เพี้ยนทั้งระบบ
+
+> **ชื่อฟิลด์**: ฝั่งส่งมีฟิลด์เวลาตัวเดียวคือ `occurredAt` (ระดับ event)
+> ฝั่งรับเก็บลง `customer_intents.observedAt` โดย **`observedAt = occurredAt` เสมอ**
+> ไม่มีฟิลด์ `observedAt` ใน payload — ทุกที่ในเอกสารที่พูดถึง `observedAt` หมายถึงค่านี้
 
 **3. ⭐ ความสนใจเปลี่ยนได้ — เราเก็บเป็นประวัติ ไม่ทับของเก่า**
 ประเมินใหม่เมื่อไรให้ส่ง **`eventId` ใหม่** ทุกครั้ง
@@ -333,6 +336,22 @@ AI ส่งผลที่ผิดชัด ๆ และไม่มีค่
 รายงานทั้งหมดตัดเดือน/สัปดาห์ตาม **Asia/Bangkok** — ถ้าส่งเวลาแบบไม่มี timezone มา จะถูก reject
 เพราะเดือนจะเหลื่อมกัน 7 ชั่วโมงและไม่มีทางรู้ว่าผิดตอนไหน
 
+## A10. `type: "tag"` — ยังไม่เปิดใช้ใน M3.5
+
+ป้ายอิสระ (`type: "tag"` และฟิลด์ `tags`) **ยังไม่มีพฤติกรรมฝั่งรับที่ตกลงกัน**
+ยังไม่ได้ตัดสินว่า "ติดป้ายเพิ่ม" หรือ "แทนที่ป้ายเดิมทั้งชุด" หรือ "ลบป้ายเดียว" และเก็บประวัติที่ไหน
+
+**สิ่งที่ฝั่งรับจะทำในระหว่างนี้**: รับไว้ ไม่ทิ้ง แต่ไม่เอาไปเขียนที่ไหน
+บันทึกลง `partner_events` ตามปกติ แล้วตอบ `status: "quarantined"` เหตุผล `unsupported_type:tag`
+
+ถ้าจะเปิดใช้ ต้องตกลงเพิ่ม 3 อย่างก่อน แล้วค่อยทำเป็นงานแยก
+1. เป็น **การกระทำ** (`add` / `remove`) หรือ **สถานะเต็มชุด** (ส่งรายการทั้งหมดมาแทนที่ของเดิม)
+2. เก็บที่ `customers.tags` ตรง ๆ (ทับของที่พนักงานติดเอง) หรือแยก namespace `partnerTags`
+3. ต้องเก็บประวัติการติด/ถอดป้ายไหม
+
+**คำแนะนำของฝั่งเรา**: อย่าใช้ `tag` เป็นช่องเก็บความสนใจ — ใช้ `intent` ที่มี schema ชัดแทน
+ป้ายอิสระควรเหลือไว้เฉพาะเรื่องที่ไม่มีโครงจริง ๆ เช่น `vip`
+
 ## A6. ❌ ห้ามส่งข้อมูลเหล่านี้
 
 - **บทสนทนากับลูกค้า ข้อความแชท รูปภาพ ไฟล์แนบ** — เด็ดขาด (D4: ระบบนี้ไม่เก็บบทสนทนา redact ตั้งแต่ webhook)
@@ -366,7 +385,7 @@ AI ส่งผลที่ผิดชัด ๆ และไม่มีค่
 |---|---|---|
 | `accepted` | บันทึกแล้ว | ไม่ต้องทำอะไร |
 | `duplicate` | เคยส่งมาแล้ว | ไม่ต้องทำอะไร — ถูกต้องแล้ว |
-| `quarantined` | รับไว้แล้วแต่ยังใช้ไม่ได้ รอคนแก้ | ไม่ต้อง retry · ข้อมูลไม่หาย |
+| `quarantined` | รับไว้แล้วแต่ยังใช้ไม่ได้ รอคนแก้ (รวมถึง `unsupported_type:tag` ตาม A10) | ไม่ต้อง retry · ข้อมูลไม่หาย |
 | `pending_identity` | รับไว้แล้ว แต่ยังไม่รู้แน่ว่าเป็นลูกค้าคนไหน | ไม่ต้อง retry |
 | `rejected` | ข้อมูลผิด schema | **แก้แล้วส่งใหม่ด้วย eventId เดิม** |
 
@@ -401,8 +420,12 @@ AI ส่งผลที่ผิดชัด ๆ และไม่มีค่
 4. `customer_intents` — ผลประเมินความสนใจแบบ append-only (A9)
 5. `partner_quarantine` — event ที่แปลงไม่ได้
 6. ผูกเข้ากับลูกค้า: `lineUserId` → `identities` · ไม่มีก็ใช้ phone/email แบบมีเงื่อนไข (B4)
-7. scrub เข้า `line_crm_ai` แบบเดียวกับ legacy (ใช้ `ai/tokens.ts` เดิม)
-8. tests
+7. **scrub เข้า `line_crm_ai` ด้วยสคริปต์แยกของตัวเอง** `npm run partner:scrub`
+   ลอกโครงจาก `scripts/scrub-legacy.ts` ทั้งดุ้น (claim/ack ผ่าน `aiSync` · `--all` · `--verify` · `--prune`)
+   **ห้ามแตะ WF-D** — WF-D มีหน้าที่เดียวคือ mirror `customers` และเพิ่งเคลียร์เสร็จ อย่าไปยุ่ง
+   collection ปลายทาง: `purchases_scrubbed` · `purchase_items_scrubbed` · `customer_intents_scrubbed`
+8. **`reconcilePartnerIdentities()`** — จับเจ้าของให้รายการที่ `customerId: null` (B4.1)
+9. tests
 
 ## B2. ❌ ไม่อยู่ในสโคป
 - ไม่ทำหน้าจอให้เจ้าหน้าที่จัดการ quarantine (แค่เก็บข้อมูลไว้ให้ครบ)
@@ -418,7 +441,7 @@ export interface PartnerEventDoc {
   partnerId: string;
   eventId: string;             // ของ partner
   revision: number;
-  type: "purchase" | "purchase.void" | "intent" | "tag";
+  type: "purchase" | "purchase.void" | "intent" | "intent.void";
   occurredAt: Date;
   receivedAt: Date;
   status: "accepted" | "quarantined" | "pending_identity" | "voided";
@@ -502,9 +525,35 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 | มี `lineUserId` แต่ไม่เจอ | สร้างลูกค้าใหม่แบบ minimal + identity `line` (ทางเดียวกับ WF-A) |
 | ไม่มี `lineUserId` · phone ตรงกับลูกค้า **1 คนเดียว** | ผูกได้ แต่ตั้ง `evidence: "phone_only"` |
 | ไม่มี `lineUserId` · phone ตรงกับ **หลายคน** | **ห้ามเดา** → `status: "pending_identity"` · `customerId: null` |
-| ไม่ตรงกับใครเลย | บันทึก purchase ไว้โดย `customerId: null` แล้วให้ M3 match ทีหลัง |
+| ไม่ตรงกับใครเลย | บันทึกไว้โดย `customerId: null` แล้วให้ `reconcilePartnerIdentities()` จับเจ้าของทีหลัง (B4.1) — **ไม่ใช่ M3** |
 
 **ห้าม merge ลูกค้าอัตโนมัติจากข้อมูลที่ partner ส่งมา** (D3) — purchase ที่ยังไม่มีเจ้าของยังนับยอดขายได้ปกติ แค่ตอบไม่ได้ว่าใครซื้อ
+
+## B4.1 ⭐ Reconciliation — จับเจ้าของย้อนหลัง
+
+**M3 (`customer_links`) ทำคนละเรื่อง** — มันจับคู่ `customers_scrubbed` กับ `legacy_persons_scrubbed`
+ไม่ได้ยุ่งกับ `purchases` / `customer_intents` ที่ `customerId: null` เลย **อย่าไปหวังพึ่งมัน**
+
+M3.5 ต้องมีตัวจับเจ้าของของตัวเอง ทำงานกับข้อมูลใน `line_crm_dev`
+
+```ts
+/** จับเจ้าของให้ purchase/intent ที่ยังไม่มี customerId — รันซ้ำได้ปลอดภัย */
+export async function reconcilePartnerIdentities(db: Db, options?: { dryRun?: boolean }): Promise<{
+  scanned: number; resolved: number; stillPending: number; ambiguous: number;
+}>;
+```
+
+ตรรกะ (ลำดับเดียวกับ B4):
+1. หา `purchases` / `customer_intents` ที่ `customerId: null`
+2. ดึง `subject` เดิมจาก `partner_events.raw` ของ `sourceEventId`
+3. ลอง `lineUserId` → `identities` · ไม่เจอลอง phone · แล้ว email
+4. ตรงกับ **1 คนเดียว** → เติม `customerId` ให้ทั้ง purchase, purchase_items และ intent ที่มาจาก event นั้น
+5. ตรงกับหลายคน → คงไว้ที่ `null` และนับเป็น `ambiguous` (D3 — ห้ามเดา)
+6. **ทุกครั้งที่เติม `customerId` ให้ intent ต้องคำนวณสาย supersede ของคีย์ `(customerId, courseCode)` นั้นใหม่ทั้งคีย์**
+   เพราะตอนที่ยังเป็น null มันถูกห้าม supersede ใครไว้ (A9.4)
+
+เรียกใช้ 2 จุด: ท้ายสคริปต์ `npm run partner:reconcile` และหลัง `intake` รับ event ที่มี `lineUserId` ใหม่
+(ลูกค้าที่เพิ่งแอด LINE วันนี้ อาจมี purchase ค้างไร้เจ้าของจากเมื่อวาน)
 
 ## B5. กฎการคำนวณ
 
@@ -561,6 +610,11 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 - `intent.void` → แถวนั้น `voidedAt` ไม่ใช่ถูกลบ และตัวปัจจุบันย้อนกลับไปเป็นแถวก่อนหน้า
 - intent ที่ `customerId: null` → ไม่ถูกนับเป็นตัวปัจจุบันของใคร และไม่ supersede ของใคร
 - `observedAt` ไม่มี timezone → `rejected`
+- `type: "tag"` → `quarantined` เหตุผล `unsupported_type:tag` และไม่เขียนอะไรลง `customers.tags` (A10)
+- ⭐ reconcile: purchase ที่ `customerId: null` แล้วต่อมามี identity ตรง 1 คน → ถูกเติมเจ้าของ
+- ⭐ reconcile: ตรงกับ 2 คน → ยังเป็น `null` และนับเป็น ambiguous ไม่เดา
+- ⭐ reconcile intent แล้วสาย supersede ถูกคำนวณใหม่ — ตัวปัจจุบันของคีย์นั้นเหลือ 1 แถว
+- `partner:scrub --verify` บนฐานที่ sync ครบ → exit 0 · ลบ doc ปลายทางออก 1 ตัว → exit 1
 - `confidence: 0.4` → `belowThreshold: true`
 - `status: "maybe"` (ค่านอกรายการ) → `quarantined` ไม่ใช่แปลงเป็น `unknown`
 - event ที่มี field `quote` / `evidence` / `snippet` → `rejected` (กัน D4 หลุด)
@@ -583,6 +637,8 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 - [ ] ยิง event สลับลำดับเวลา 20 ตัว → ทุกคีย์มีตัวปัจจุบันแค่ 1 แถว และเป็นแถวที่ `observedAt` ใหม่สุดจริง
 - [ ] สถานการณ์จริง: staff แก้ → ลูกค้าเปลี่ยนใจเดือนถัดมา → AI ทับได้ ไม่ค้าง
 - [ ] ไม่มี field ใดใน `customer_intents` ที่มีข้อความจากแชทลูกค้า
+- [ ] `npm run partner:scrub -- --verify` ผ่าน และ **ไม่มีการแก้ WF-D หรือไฟล์ใน `workflows/` เลย**
+- [ ] `npm run partner:reconcile` รันซ้ำ 2 ครั้งได้ผลเท่ากัน (idempotent)
 - [ ] เขียน `docs/27-s11-m35-report.md` พร้อมผลรันจริงจาก terminal
 
 ## B8. กฎที่ห้ามละเมิด
@@ -600,6 +656,26 @@ export interface PurchaseItemDoc {      // ที่นั่ง — โคร�
 10. business logic อยู่ใน `packages/core`
 
 ---
+
+## B9. สิ่งที่มีอยู่แล้ว ใช้ซ้ำได้เลย อย่าเขียนใหม่
+
+| ของที่มี | ที่อยู่ | ใช้ทำอะไรใน M3.5 |
+|---|---|---|
+| `verifyInternal` / `signInternal` | `packages/core/src/events/publisher.ts` | ตรวจ HMAC — **สูตรเดียวกันเป๊ะ** แค่เปลี่ยน secret เป็นของ partner |
+| `readSignedJson` | `apps/web/lib/internal.ts` | แบบอย่างการอ่าน body ดิบ + ตรวจลายเซ็น (ต้องทำตัวใหม่ที่รับ `x-partner-id`) |
+| `ok` / `fail` / `newRequestId` | `apps/web/lib/http.ts` | รูปแบบ response มาตรฐานของโปรเจกต์ |
+| `parseCourseCell` + `EnrollmentKind` | `packages/core/src/legacy/courseCell.ts` | ชนิดของ `kind` และการตัดสิน `countsAsSeat` — **ห้ามนิยามใหม่** |
+| `courseByHeader` / `courseByCode` / `COURSES` | `packages/core/src/legacy/courses.ts` | แปลง `courseLabel` → `courseCode` · ไม่รู้จักคืน `null` ให้เข้า quarantine |
+| `LegacyPaymentDoc` / `LegacyEnrollmentDoc` | `packages/core/src/legacy/models.ts` | โครงที่ `PurchaseDoc` / `PurchaseItemDoc` ต้องเลียนแบบ เพื่อให้ M4 union สองแหล่งได้ |
+| `personToken` · `phoneHash` · `emailHash` · `nameKeys` · `ageBand` | `packages/core/src/ai/tokens.ts` | scrub — **ห้าม copy สูตรไปเขียนใหม่ที่อื่น** |
+| `scrubLegacyPayment` / `scrubLegacyEnrollment` | `packages/core/src/ai/scrubLegacy.ts` | แบบอย่างของ `scrubPurchase` / `scrubPurchaseItem` |
+| `claimLegacyAiSync` / `ackLegacyAiSync` | `packages/core/src/legacy/aiQueue.ts` | คิว `aiSync` — generic รับชื่อ collection อยู่แล้ว ใช้กับ `purchases` ได้เลย |
+| `ensureLegacyIndexes` / `ensureAiIndexes` / `verifyAiIndexes` | `packages/core/src/legacy/indexes.ts` · `ai/indexes.ts` | แบบอย่างการสร้างและ**ตรวจ** index (ตรวจถึง key + unique + sparse) |
+| `scripts/scrub-legacy.ts` | — | **แม่แบบของ `scripts/scrub-partner.ts`** ทั้ง arg parsing, `--all/--verify/--prune`, exit code, ไม่พิมพ์ URI |
+| `scripts/smoke-line-webhook.ts` | — | แบบอย่าง `smoke:partner` — ยิง request ที่เซ็นลายเซ็นถูกต้อง |
+| `normalizePhone` / `normalizeEmail` | `packages/core/src/identity/normalize.ts` | normalize `subject.phone` ก่อนหาเจ้าของ |
+| `resolveLiff` / `upsertFromLine` | `packages/core/src/identity/` | แบบอย่างการหาลูกค้าจาก identity และการสร้างลูกค้าใหม่แบบ minimal (B4) |
+| `env()` แบบแบ่งกลุ่ม | `packages/core/src/env.ts` | เพิ่มกลุ่ม `partner` — ทุกตัว optional ขาดแล้วต้องไม่พังทั้งระบบ |
 
 ## §C คำถามที่ยังต้องการคำตอบจากฝั่งระบบ tag
 
