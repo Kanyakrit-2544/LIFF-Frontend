@@ -16,6 +16,9 @@ const PREFIX = {
   identity: "idn",
   profile: "prf",
   job: "job",
+  legacyPerson: "lgp",
+  legacyPayment: "lgy",
+  legacyEnrollment: "lge",
 } as const;
 
 export type IdKind = keyof typeof PREFIX;

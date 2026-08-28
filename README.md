@@ -36,6 +36,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 18 | [S7 — ตรวจความปลอดภัย](docs/18-s7-security-review.md) | injection, ช่องโหว่ดูดข้อมูลด้วยเบอร์, rate limit, logging |
 | 19 | [S8 — Google Sheets Sync](docs/19-s8-sheets-sync.md) | นิยามคอลัมน์, คิวซิงก์, WF-C, ผลทดสอบจริง |
 | 20 | [S9 — Plaintext DB + AI Mirror](docs/20-s9-plaintext-ai-mirror.md) | plaintext phone/email, scrubbed AI DB, WF-D, ผลทดสอบจริง |
+| 21 | [S11 — ฐาน legacy (mock) + จับคู่ด้วย AI](docs/21-legacy-mock-and-ai-matching.md) | ข้อมูล synthetic จากสถิติชีตขาย, โครง persons/payments/enrollments, กติกาให้ LLM |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
 ## Design Decisions (ยืนยันแล้ว)
@@ -64,6 +65,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | D20 | ข้อความต้อนรับตอน follow | **ยังไม่ส่ง** — รอ S6 ที่มีปุ่มเปิดฟอร์ม LIFF |
 | D21 | ปลายทาง alert เวลาระบบพัง | **เก็บ log ในระบบ** ยังไม่ต่อช่องทางภายนอก |
 | D22 | ค่าของ `channelId` | ใช้ `destination` จาก LINE webhook body |
+| D23 | เอา `customer_links` ไปใช้ยังไง | **สถิติรวมเท่านั้น** — โชว์ประวัติซื้อรายบุคคลต้องมีคนกดยืนยันก่อน เพราะเบอร์ที่ผู้ใช้พิมพ์เองไม่ได้ verify (docs/21) |
 
 ## สถานะ
 

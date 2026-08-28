@@ -23,7 +23,9 @@
     "setup:sheet": "tsx --env-file=apps/web/.env.local scripts/setup-sheet.ts",
     "cleanup:db-obsolete": "tsx --env-file=apps/web/.env.local scripts/cleanup-obsolete-db.ts",
     "verify:db-users": "tsx scripts/verify-db-users.ts",
-    "reset:demo": "tsx --env-file=apps/web/.env.local scripts/reset-demo.ts"
+    "reset:demo": "tsx --env-file=apps/web/.env.local scripts/reset-demo.ts",
+    "legacy:profile": "python3 scripts/legacy/profile_xlsx.py \"raw input/Inner.xlsx\" Inner2025 Inner2026",
+    "legacy:generate": "tsx --env-file=apps/web/.env.local scripts/generate-legacy-mock.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
