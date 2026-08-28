@@ -31,3 +31,7 @@ google-service-account.json
 *.tsbuildinfo
 
 SECRETS.local.md
+
+# ไฟล์สำรองตอนแก้ env — มี secret อยู่ข้างใน ห้ามหลุดเข้า git
+*.bak-*
+*.bak
