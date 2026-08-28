@@ -33,6 +33,8 @@ describe("scrubLegacy", () => {
     expect(text).not.toMatch(/0[689]\d{8}/);
     expect(text).not.toMatch(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);
     expect(scrubbed.fullNameTh).toMatch(/^<PERSON_[0-9a-f]{8}>$/);
+    expect(scrubbed.nameKeys.length).toBeGreaterThanOrEqual(2);
+    expect(scrubbed.nameKeys.every((key) => /^[0-9a-f]{12}$/.test(key))).toBe(true);
     expect(scrubbed.phone).toMatch(/^0[689]x-xxx-\d{4}$/);
     expect(scrubbed.email === null || scrubbed.email.includes("***")).toBe(true);
     expect(scrubbed.phone).not.toMatch(/0[689]\d{8}/);

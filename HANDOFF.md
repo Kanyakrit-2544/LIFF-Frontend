@@ -24,7 +24,7 @@ Next.js 15 (App Router) บน Vercel · MongoDB Atlas · n8n (Docker บนเ�
 
 ## เอกสาร
 
-`README.md` มี index ครบ · `docs/00`–`docs/23` · **`docs/13`** = สเปกที่เขียนให้ Codex เป็นตัวอย่างรูปแบบที่ใช้ได้ผล
+`README.md` มี index ครบ · `docs/00`–`docs/25` · **`docs/13`** = สเปกที่เขียนให้ Codex เป็นตัวอย่างรูปแบบที่ใช้ได้ผล
 
 ## กฎที่ยึดมาตลอด ห้ามละเมิด
 
@@ -73,7 +73,7 @@ Codex รายงาน "ผ่าน" มาหลายรอบทั้ง�
 
 ## สถานะปัจจุบัน
 
-**เสร็จแล้ว** S1–S10 + S11-M1/M2 · 235 tests ผ่าน (core 185 · web 50) skipped 0 · typecheck ผ่าน · scrub/verify ผ่านบน Mongo local
+**เสร็จแล้ว** S1–S10 + S11-M1/M2/M3 · 258 tests ผ่าน (core 208 · web 50) skipped 0 · typecheck ผ่าน · match fixture 25/verify ผ่านบน Mongo local
 
 **⚠️ ค้างอยู่ตอนนี้ — งานแรกที่ต้องทำ**
 
@@ -99,7 +99,6 @@ Codex รายงาน "ผ่าน" มาหลายรอบทั้ง�
 | หน้าให้พนักงานกด merge (`pendingMerge`) | กลาง |
 | ลบ collection `__p` (ขยะจากสคริปต์ทดสอบ) | ต่ำ |
 | Presidio scrub จริง | ต่ำ — รอตอนเพิ่มคำถามปลายเปิด |
-| **S11-M3 match engine** | ยังไม่เริ่ม — ห้ามรวมอยู่ใน M2 |
 | Meta / Facebook | ต่ำ — `identities` รองรับแล้ว insert เพิ่มได้เลย |
 | import ไฟล์ลูกค้าเก่า `raw input/Inner.xlsx` | ยังไม่อยู่ในสโคป — 10,998 แถว ลูกค้าซ้ำ 1,648 คน ต้องมีแผน dedupe |
 
@@ -133,6 +132,9 @@ npm run env:vercel -- --domain liff-frontend-three.vercel.app --keep-secrets
 npm run legacy:scrub -- --legacy-uri "<uri>" --ai-uri "<uri>" --ai-db line_crm_ai
 npm run legacy:scrub -- --legacy-uri "<uri>" --ai-uri "<uri>" --ai-db line_crm_ai --verify
 npm run legacy:scrub -- --legacy-uri "<uri>" --ai-uri "<uri>" --ai-db line_crm_ai --prune   # ลบของกำพร้าหลัง regen ฐาน legacy
+npm run match:build -- --ai-uri "<uri>" --ai-db line_crm_ai --no-llm
+npm run match:build -- --ai-uri "<uri>" --ai-db line_crm_ai_test --plant 25
+npm run match:build -- --ai-uri "<uri>" --ai-db line_crm_ai_test --verify
 
 docker compose up -d / stop n8n / logs -f n8n
 ```

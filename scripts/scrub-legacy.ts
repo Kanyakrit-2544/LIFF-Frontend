@@ -46,6 +46,9 @@ const fullEmail = /[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 
 function scrubbedPayloadIsSafe(value: unknown): boolean {
   const walk = (node: unknown, key = ""): boolean => {
+    if (key === "nameKeys" && Array.isArray(node)) {
+      return node.every((value) => typeof value === "string" && /^[0-9a-f]{12}$/.test(value));
+    }
     if (typeof node === "string" && key !== "phoneHash" && key !== "emailHash" && key !== "slipGroupId") {
       if (fullPhone.test(node) || fullEmail.test(node)) return false;
     }

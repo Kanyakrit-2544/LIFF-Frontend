@@ -40,6 +40,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 22 | [S11-M2 — สเปก scrub legacy](docs/22-s11-m2-spec.md) | scrub deterministic เข้า AI DB, queue, index, verify |
 | 23 | [S11-M2 — Implementation Report](docs/23-s11-m2-report.md) | ผลรันจริง: scrub/verify/idempotency + hash parity |
 | 24 | [S11-M3 — สเปก Match Engine](docs/24-s11-m3-spec.md) | จับคู่ลูกค้า LINE ↔ ประวัติซื้อ, กติกา hash, ขอบเขตที่ LLM เห็นได้ |
+| 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรัน match engine, fixture 25, privacy tests และข้อจำกัด LLM |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
 ## Design Decisions (ยืนยันแล้ว)
@@ -73,6 +74,9 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | D25 | `raw` ของเซลล์คอร์ส | **ห้ามออกจาก `line_crm_legacy`** เพราะอาจมีชื่อคนจริงฝังอยู่ |
 | D26 | อายุใน AI DB | ส่งเป็นช่วง 10 ปี (`ageBand`) ไม่ส่งอายุเต็ม |
 | D27 | เลขสลิปใน AI DB | ส่ง `slipGroupId` แบบ hash 12 ตัวแทนเลขสลิปจริง |
+| D28 | ข้อมูลที่ LLM เห็น | เห็นเฉพาะ feature แบบตัวเลข/boolean ห้ามส่งชื่อ เบอร์ อีเมล ID หรือ person token |
+| D29 | hash ตรงหลายคน | **ห้าม auto-link** ทุกคู่ต้องเป็น `needs_review` |
+| D30 | ไม่มี LLM | deterministic matching ยังทำงานได้ครบ และรายงานคู่ที่ข้าม |
 
 ## สถานะ
 
@@ -90,6 +94,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 - [x] **S8 — Google Sheets sync + WF-C** ✅ 175 tests ผ่าน
 - [x] **S9 — Plaintext DB + AI Mirror + WF-D** ✅ 178 integration tests ผ่านบน Atlas dev
 - [x] **S11-M2 — Scrub legacy เข้า AI mirror** ✅ integration + verify ผ่านบน Mongo local
+- [x] **S11-M3 — Match Engine** ✅ fixture 25, deterministic build/verify และ privacy tests ผ่านบน Mongo local
 - [ ] Phase 5 — Implementation (S10 → S11)
 - [ ] Phase 6 — Testing
 

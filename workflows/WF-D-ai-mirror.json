@@ -131,7 +131,7 @@
         "operation": "update",
         "collection": "customers_scrubbed",
         "updateKey": "customerId",
-        "fields": "title,status,mergedInto,displayName,nickname,fullNameEn,phone,email,phoneHash,emailHash,birthYear,province,customerStatus,tags,sources,consentMarketing,firstInteractionAt,firstMessageAt,formSubmittedAt,syncedAt,sourceUpdatedAt",
+        "fields": "title,status,mergedInto,displayName,nickname,fullNameEn,phone,email,phoneHash,emailHash,nameKeys,nicknameKey,birthYear,province,customerStatus,tags,sources,consentMarketing,firstInteractionAt,firstMessageAt,formSubmittedAt,syncedAt,sourceUpdatedAt",
         "upsert": true,
         "options": {
           "upsert": true

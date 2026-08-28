@@ -16,7 +16,7 @@ export {
   maskPhone,
   maskEmail,
 } from "./security/pii";
-export { personToken, phoneHash, emailHash, ageBand, slipGroupId } from "./ai/tokens";
+export { personToken, phoneHash, emailHash, ageBand, slipGroupId, nameKeys } from "./ai/tokens";
 export {
   scrubLegacyPerson,
   scrubLegacyPayment,
@@ -26,7 +26,7 @@ export {
   type ScrubbedLegacyPayment,
   type ScrubbedLegacyEnrollment,
 } from "./ai/scrubLegacy";
-export { ensureAiIndexes, verifyAiIndexes, AI_INDEX_SPECS } from "./ai/indexes";
+export { ensureAiIndexes, verifyAiIndexes, aiIndexMatchesSpec, AI_INDEX_SPECS, type AiIndexSpec } from "./ai/indexes";
 export {
   claimLegacyAiSync,
   ackLegacyAiSync,
@@ -36,6 +36,20 @@ export {
   type LegacyAiAckItem,
 } from "./legacy/aiQueue";
 export { legacyMirrorCountsOk, type LegacyMirrorCount } from "./legacy/verify";
+export { decideByRules, type MatchCandidate, type RuleDecision } from "./match/rules";
+export {
+  buildMatchCandidates,
+  customerRowId,
+  toLlmFeatures,
+  type CandidatePair,
+  type LlmPairFeatures,
+  type MatchCustomerRow,
+  type MatchLegacyRow,
+} from "./match/candidates";
+export { createLlmProvider, type LlmProvider } from "./ai/llm/provider";
+export { evaluateLlmPairs, llmDecisionToRule, serializeLlmBatch, type LlmMatchDecision, type LlmPairResult } from "./ai/llm/match";
+export { buildCustomerLinks, verifyCustomerLinks, type MatchBuildOptions, type MatchBuildReport, type MatchVerifyReport } from "./match/engine";
+export { plantMatchFixtures, unplantMatchFixtures, type PlantReport } from "./match/fixtures";
 
 export { getClient, getDb, closeClient, pingDb } from "./db/client";
 export { ensureIndexes, verifyIndexes, INDEX_SPECS, type EnsureResult } from "./db/indexes";

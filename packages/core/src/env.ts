@@ -49,12 +49,27 @@ const n8nSchema = z.object({
   N8N_WEBHOOK_FORM: z.string().url().optional(),
 });
 
+const optionalText = z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional());
+
+const llmSchema = z.object({
+  LLM_BASE_URL: optionalText.pipe(z.string().url().optional()),
+  LLM_API_KEY: optionalText,
+  LLM_MODEL: optionalText,
+  LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+  LLM_MAX_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
+  LLM_ALLOW_NAME_PAIRS: z
+    .string()
+    .default("false")
+    .transform((value) => value === "true" || value === "1"),
+});
+
 const groups = {
   db: dbSchema,
   ai: aiSchema,
   line: lineSchema,
   security: securitySchema,
   n8n: n8nSchema,
+  llm: llmSchema,
 } as const;
 
 type Groups = typeof groups;

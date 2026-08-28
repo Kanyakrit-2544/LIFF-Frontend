@@ -1,4 +1,5 @@
 import { hashValue } from "../security/pii";
+import { normalizeName } from "../identity/normalize";
 
 /** Tokenize a person label without sending the original value to the AI mirror. */
 export function personToken(value: string | null | undefined): string | null {
@@ -29,4 +30,18 @@ export function slipGroupId(slipNo: string | null | undefined): string | null {
   const normalized = slipNo?.trim().toUpperCase();
   if (!normalized) return null;
   return hashValue(`SLIP|${normalized}`).slice(0, 12);
+}
+
+/** D28: hash name parts so matching can compare overlap without exposing names. */
+export function nameKeys(...values: Array<string | null | undefined>): string[] {
+  const keys = new Set<string>();
+  for (const value of values) {
+    const normalized = normalizeName(value)?.toLocaleLowerCase("th-TH");
+    if (!normalized) continue;
+    for (const word of normalized.match(/[\p{L}\p{N}]+/gu) ?? []) {
+      if (word.length < 2) continue;
+      keys.add(hashValue(`NAMEPART|${word}`).slice(0, 12));
+    }
+  }
+  return [...keys].sort();
 }

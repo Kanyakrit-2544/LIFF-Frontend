@@ -1,5 +1,5 @@
 import { maskEmail, maskPhone } from "../security/pii";
-import { ageBand, emailHash, personToken, phoneHash, slipGroupId } from "./tokens";
+import { ageBand, emailHash, nameKeys, personToken, phoneHash, slipGroupId } from "./tokens";
 import type { LegacyEnrollmentDoc, LegacyPaymentDoc, LegacyPersonDoc } from "../legacy/models";
 
 const date = (value: Date | null | undefined) => (value ? value.toISOString().slice(0, 10) : null);
@@ -26,6 +26,8 @@ export interface ScrubbedLegacyPerson {
   email: string | null;
   phoneHash: string | null;
   emailHash: string | null;
+  nameKeys: string[];
+  nicknameKey: string | null;
   ageBand: string | null;
   firstPaidAt: string | null;
   lastPaidAt: string | null;
@@ -84,6 +86,8 @@ export function scrubLegacyPerson(
     email: person.email ? maskEmail(person.email) : null,
     phoneHash: phoneHash(person.phone),
     emailHash: emailHash(person.email),
+    nameKeys: nameKeys(person.fullNameTh, person.fullNameEn),
+    nicknameKey: nameKeys(person.nickname)[0] ?? null,
     ageBand: ageBand(person.ageAtImport),
     firstPaidAt: date(person.firstPaidAt),
     lastPaidAt: date(person.lastPaidAt),

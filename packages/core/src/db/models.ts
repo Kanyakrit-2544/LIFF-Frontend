@@ -16,6 +16,7 @@ export const AI_COLLECTIONS = {
   legacyPersonsScrubbed: "legacy_persons_scrubbed",
   legacyPaymentsScrubbed: "legacy_payments_scrubbed",
   legacyEnrollmentsScrubbed: "legacy_enrollments_scrubbed",
+  customerLinks: "customer_links",
 } as const;
 
 export type IdentityProvider =
@@ -30,6 +31,31 @@ export type IdentityProvider =
 
 export type CustomerStatus = "lead" | "prospect" | "customer" | "inactive";
 export type RecordStatus = "active" | "merged" | "archived";
+
+export interface CustomerLinkDoc {
+  _id: string;
+  customerId: string;
+  legacyPersonId: string;
+  method: "phone_hash" | "email_hash" | "llm_features";
+  confidence: "high" | "medium" | "low";
+  score: number;
+  status: "auto" | "needs_review" | "confirmed" | "rejected";
+  evidence: {
+    phoneHashMatch: boolean;
+    emailHashMatch: boolean;
+    nameKeyOverlap: number;
+    nicknameMatch: boolean;
+    ageBandMatch: boolean | null;
+    llmReason?: string;
+    llmModel?: string;
+    competingCandidates: number;
+  };
+  decidedBy: "rule" | "llm" | "staff";
+  decidedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  schemaVersion: number;
+}
 
 export interface CustomerDoc {
   _id: string; // cus_<ULID>

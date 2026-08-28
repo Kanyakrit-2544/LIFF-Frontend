@@ -65,6 +65,8 @@ describe("scrubCustomer", () => {
     expect(s.phone).toBe("08x-xxx-5678");
     expect(s.email).toBe("so***@gmail.com");
     expect(s.phoneHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(s.nameKeys).toHaveLength(4);
+    expect(s.nicknameKey).toMatch(/^[0-9a-f]{12}$/);
     expect(s.birthYear).toBe(2535);
     expect(s.consentMarketing).toBe(true);
     expect(s.syncedAt).toBe("2026-08-27T04:00:00.000Z");

@@ -4,5 +4,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["scripts/scrub-legacy.ts"]
+  "include": ["scripts/scrub-legacy.ts", "scripts/build-matches.ts"]
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { scrubCustomer } from "../src/ai/scrubCustomer";
-import { ageBand, emailHash, phoneHash, slipGroupId } from "../src/ai/tokens";
+import { ageBand, emailHash, nameKeys, phoneHash, slipGroupId } from "../src/ai/tokens";
 import { normalizePhone } from "../src/identity/normalize";
 import type { CustomerDoc } from "../src/db/models";
 
@@ -66,5 +66,11 @@ describe("AI tokens", () => {
     expect(id).toBe(slipGroupId("IN-6806-00164"));
     expect(id).toMatch(/^[0-9a-f]{12}$/);
     expect(id).not.toContain("6806");
+  });
+
+  it("nameKeys ตัดคำนำหน้าและ hash คำชื่อแบบ deterministic", () => {
+    expect(nameKeys("คุณ สมชาย ใจดี")).toEqual(nameKeys("สมชาย   ใจดี"));
+    expect(nameKeys("สมชาย ใจดี")).toHaveLength(2);
+    expect(nameKeys("สมชาย ใจดี").every((key) => /^[0-9a-f]{12}$/.test(key))).toBe(true);
   });
 });
