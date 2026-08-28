@@ -40,6 +40,8 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 22 | [S11-M2 — สเปก scrub legacy](docs/22-s11-m2-spec.md) | scrub deterministic เข้า AI DB, queue, index, verify |
 | 23 | [S11-M2 — Implementation Report](docs/23-s11-m2-report.md) | ผลรันจริง: scrub/verify/idempotency + hash parity |
 | 24 | [S11-M3 — สเปก Match Engine](docs/24-s11-m3-spec.md) | จับคู่ลูกค้า LINE ↔ ประวัติซื้อ, กติกา hash, ขอบเขตที่ LLM เห็นได้ |
+| 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรันจริง + ผลรีวิว (ตรวจ PII ระดับ wire) |
+| 26 | [S11-M3.5 — สัญญาเชื่อมต่อระบบติด Tag](docs/26-purchase-intake-contract.md) | **§A ข้อกำหนดให้ระบบ tag · §B สเปกฝั่งรับ** |
 | 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรัน match engine, fixture 25, privacy tests และข้อจำกัด LLM |
 | 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
