@@ -156,7 +156,12 @@ export async function buildCustomerLinks(db: Db, options: MatchBuildOptions = {}
     });
   }
   for (const previous of existing) {
-    if (previous.status === "confirmed" || previous.status === "rejected") continue;
+    if (previous.status === "confirmed" || previous.status === "rejected") {
+      // นับด้วย — เคสที่คนกังวลที่สุดคือ "ของที่พนักงานตัดสินแล้วถูกเครื่องลบทิ้ง"
+      // ถ้าไม่นับตรงนี้ รายงานจะขึ้น 0 ทั้งที่เพิ่งป้องกันไปจริง ๆ
+      if (!planned.has(pairKey(previous.customerId, previous.legacyPersonId))) report.preservedStaff++;
+      continue;
+    }
     const key = pairKey(previous.customerId, previous.legacyPersonId);
     if (planned.has(key)) continue;
     const staleRule = previous.decidedBy === "rule";
@@ -182,6 +187,8 @@ export interface MatchVerifyReport {
   ok: boolean;
   plantCustomers: number;
   plantLinks: number;
+  /** เฉพาะ link ที่กฎ deterministic สร้าง — ตัวนี้เท่านั้นที่เทียบกับจำนวนที่ปลูกไว้ได้ */
+  plantRuleLinks: number;
   expectedPlantLinks: number;
   duplicatePairs: number;
   unsafeAuto: number;
@@ -192,9 +199,12 @@ export async function verifyCustomerLinks(db: Db): Promise<MatchVerifyReport> {
   const customers = db.collection<MatchCustomerRow>(AI_COLLECTIONS.customersScrubbed);
   const links = db.collection<CustomerLinkDoc>(AI_COLLECTIONS.customerLinks);
   const plantFilter = { customerId: { $regex: "^cus_PLANT_" } } as Filter<CustomerLinkDoc>;
-  const [plantCustomers, plantLinks, noMatchCustomers, duplicates, unsafeAuto, familyAuto] = await Promise.all([
+  const [plantCustomers, plantLinks, plantRuleLinks, noMatchCustomers, duplicates, unsafeAuto, familyAuto] = await Promise.all([
     customers.countDocuments({ $or: [{ _id: { $regex: "^cus_PLANT_" } }, { customerId: { $regex: "^cus_PLANT_" } }] } as Filter<MatchCustomerRow>),
     links.countDocuments(plantFilter),
+    // ชั้น LLM สร้าง link needs_review เพิ่มได้เสมอ ซึ่งเป็นพฤติกรรมที่ถูกต้อง
+    // ถ้าเอายอดรวมไปเทียบกับจำนวน fixture verify จะตกทุกครั้งที่เปิด LLM
+    links.countDocuments({ ...plantFilter, decidedBy: "rule" } as Filter<CustomerLinkDoc>),
     customers.countDocuments({ $or: [{ _id: { $regex: "^cus_PLANT_NOMATCH_" } }, { customerId: { $regex: "^cus_PLANT_NOMATCH_" } }] } as Filter<MatchCustomerRow>),
     links.aggregate<{ count: number }>([
       { $group: { _id: { customerId: "$customerId", legacyPersonId: "$legacyPersonId" }, count: { $sum: 1 } } },
@@ -207,11 +217,12 @@ export async function verifyCustomerLinks(db: Db): Promise<MatchVerifyReport> {
   const duplicatePairs = duplicates.length;
   const fixtureOk = plantCustomers === 0
     ? plantLinks === 0
-    : plantLinks === expectedPlantLinks;
+    : plantRuleLinks === expectedPlantLinks;
   return {
     ok: fixtureOk && duplicatePairs === 0 && unsafeAuto === 0 && familyAuto === 0,
     plantCustomers,
     plantLinks,
+    plantRuleLinks,
     expectedPlantLinks,
     duplicatePairs,
     unsafeAuto,

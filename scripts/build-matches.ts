@@ -73,7 +73,10 @@ async function main(): Promise<void> {
     }
     if (verify) {
       const [links, indexes] = await Promise.all([verifyCustomerLinks(db), verifyAiIndexes(db)]);
-      console.log(`fixture customers ${links.plantCustomers} · links ${links.plantLinks}/${links.expectedPlantLinks}`);
+      console.log(
+        `fixture customers ${links.plantCustomers} · link จากกฎ ${links.plantRuleLinks}/${links.expectedPlantLinks}` +
+          ` · link ทั้งหมด ${links.plantLinks} (ส่วนเกินคือ needs_review จาก LLM ซึ่งถูกต้อง)`
+      );
       console.log(`คู่ซ้ำ ${links.duplicatePairs} · auto ที่ไม่ปลอดภัย ${links.unsafeAuto} · family auto ${links.familyAuto}`);
       console.log(`indexes ${indexes.ok ? "ครบ" : `ขาด ${indexes.missing.join(", ")}`}`);
       if (!links.ok || !indexes.ok) process.exitCode = 1;

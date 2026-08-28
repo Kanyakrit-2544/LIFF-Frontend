@@ -101,3 +101,78 @@ scripts         tsconfig.scripts   ผ่าน
 - อย่าเปลี่ยน `AI_HASH_PEPPER` มิฉะนั้น name/hash join เดิมจะใช้ไม่ได้
 - link จากชื่อหรือ LLM เป็น `needs_review` เสมอ และยังไม่มีหน้าจอให้พนักงานยืนยันตามขอบเขต M3
 - งาน analytics/insights ยังไม่ได้เริ่ม เป็น S11-M4
+
+---
+
+## ผลรีวิว (โดยผู้รีวิว ไม่ใช่ผู้ทำ) — 2026-08-28
+
+รันเองทั้งหมด ไม่ยึดตามรายงานข้างบน
+
+### ทดสอบว่า PII หลุดไปหา LLM จริงไหม — ระดับ wire ไม่ใช่ระดับ unit test
+
+ตั้ง HTTP server ปลอมที่บันทึก request body ทุกก้อน แล้วชี้ `LLM_BASE_URL` มาที่นั่น
+รัน pipeline จริงกับ fixture 25 คน → จับ request ได้ 5 ก้อน (95 คู่)
+
+```text
+key ที่ส่งออกไปจริงทั้งหมด:
+  ageBandMatch, courseOverlap, daysBetweenFirstSeen, emailDomainMatch,
+  nameKeyOverlap, nameKeyTotalA, nameKeyTotalB, nicknameMatch, pairId, phoneLast4Match
+key เกินจากที่ D28 อนุญาต: ไม่มี
+
+ตัวอย่างสิ่งที่ส่งออกจริง:
+  {"pairId":"p1","nameKeyOverlap":0,"nameKeyTotalA":2,"nameKeyTotalB":4,
+   "nicknameMatch":false,"ageBandMatch":true,"phoneLast4Match":true,
+   "emailDomainMatch":false,"courseOverlap":0,"daysBetweenFirstSeen":361}
+
+สแกนหา: อักษรไทย · <PERSON_ · cus_/lgp_/lnk_ · @ · เลข 9 หลักขึ้นไป · เบอร์ mask
+ผล: ✅ ไม่พบเลยแม้แต่ก้อนเดียว
+```
+
+### ทดสอบกฎความปลอดภัยด้วย query ของผมเอง
+
+```text
+auto ที่มีคู่แข่ง (ห้ามมี)          : 0
+auto ที่มาจากชื่ออย่างเดียว (ห้ามมี) : 0
+auto ที่มาจาก LLM (ห้ามมี)          : 0
+ครอบครัวใช้เบอร์เดียวกัน → needs_review ทั้งหมด ไม่มี auto
+```
+
+### ทดสอบการถอด link เก่า (fix ข้อ 1 ของ Codex)
+
+ให้ LLM ปลอมตอบ `same` → ได้ link 116 → ตั้ง 1 อันเป็น `confirmed` (จำลองพนักงานกดยืนยัน)
+→ เปลี่ยนให้ LLM ตอบ `different` แล้วรันใหม่
+
+```text
+ถอด link เครื่องเก่า 94   (จาก 95 — เหลืออันที่พนักงานยืนยันไว้)
+link ที่เหลือ 22 = 21 จากกฎ + 1 ที่พนักงานยืนยัน
+```
+
+ทำงานถูกต้อง
+
+### ทดสอบการตรวจ index (fix ข้อ 4)
+
+สร้าง index ชื่อ `ux_pair` ที่ key ถูกแต่**ไม่ได้ตั้ง unique** → รายงาน `indexes ขาด customer_links.ux_pair` + exit 1
+ตรวจได้ลึกกว่าชื่อจริง
+
+### แก้เพิ่มระหว่างรีวิว
+
+| แก้ | เหตุผล |
+|---|---|
+| `verifyCustomerLinks` เทียบ `plantRuleLinks` แทน `plantLinks` | **เดิม `--verify` จะตกทุกครั้งที่เปิด LLM** เพราะบังคับให้จำนวน link ทั้งหมดเท่ากับจำนวน fixture พอดี แต่ชั้น LLM สร้าง `needs_review` เพิ่มเป็นเรื่องปกติ (ทดสอบแล้ว: 116 link → verify ตก exit 1 ทั้งที่ทุกอย่างถูก) Codex ไม่เจอเพราะทดสอบด้วย `--no-llm` |
+| นับ `preservedStaff` ตอนป้องกันการลบด้วย | เดิมรายงาน `ไม่แตะของที่คนตัดสินแล้ว 0` ทั้งที่เพิ่งป้องกัน link ของพนักงานไป 1 อัน — ตัวเลขที่คนใช้ตรวจว่า "เครื่องไม่ลบของที่คนตัดสิน" กลับไม่นับเคสนั้น |
+| เพิ่ม regression test 2 ตัว | ครอบคลุมทั้งสองเคสข้างบน |
+
+### ผลรันสุดท้าย
+
+```text
+RUN_MONGO_INTEGRATION=true npm test
+core 210 passed (27 files) · web 50 passed · skipped 0
+npm run typecheck  ผ่านทั้ง core / web / scripts
+
+end-to-end พร้อม LLM:
+  ชั้น 3 LLM: ถาม 95 คู่ · same 95
+  fixture customers 25 · link จากกฎ 21/21 · link ทั้งหมด 116
+  คู่ซ้ำ 0 · auto ที่ไม่ปลอดภัย 0 · family auto 0 · indexes ครบ · exit 0
+```
+
+**สรุป: ผ่านเกณฑ์ใน `docs/24` §5 ครบ** ยังไม่ได้ทดสอบกับ Hermes จริง (เครื่องนี้ยังไม่มี endpoint)

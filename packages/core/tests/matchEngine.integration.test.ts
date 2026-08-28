@@ -138,4 +138,35 @@ describe.runIf(runIntegration)("S11-M3 match engine", () => {
     await buildCustomerLinks(db, { llmProvider: llm("different") });
     expect(await links.countDocuments({ customerId, decidedBy: "llm" })).toBe(0);
   });
+
+  it("⭐ verify ต้องไม่ตกเพราะ link ที่ LLM สร้าง — LLM เพิ่ม needs_review ได้เสมอ", async () => {
+    await plantMatchFixtures(db, 16);
+    await buildCustomerLinks(db, { llmProvider: null });
+    const withoutLlm = await verifyCustomerLinks(db);
+    expect(withoutLlm.ok).toBe(true);
+
+    await buildCustomerLinks(db, { llmProvider: llm("same") });
+    const withLlm = await verifyCustomerLinks(db);
+    expect(withLlm.plantLinks).toBeGreaterThan(withLlm.plantRuleLinks);
+    expect(withLlm.plantRuleLinks).toBe(withLlm.expectedPlantLinks);
+    expect(withLlm.ok).toBe(true);
+  });
+
+  it("⭐ นับ link ของพนักงานที่ถูกป้องกันไม่ให้ลบ — ไม่ใช่รายงาน 0 ทั้งที่ป้องกันจริง", async () => {
+    await plantMatchFixtures(db, 8);
+    const links = db.collection<CustomerLinkDoc>(AI_COLLECTIONS.customerLinks);
+    const customers = db.collection(AI_COLLECTIONS.customersScrubbed);
+    const source = await db.collection<MatchLegacyRow>(AI_COLLECTIONS.legacyPersonsScrubbed).findOne({});
+    const customerId = "cus_PLANT_NOMATCH_001";
+    await customers.updateOne({ customerId }, { $set: { nameKeys: [source!.nameKeys![0]!], birthYear: null } });
+
+    await buildCustomerLinks(db, { llmProvider: llm("same") });
+    const created = await links.findOne({ customerId, decidedBy: "llm" });
+    await links.updateOne({ _id: created!._id }, { $set: { status: "confirmed", decidedBy: "staff" } });
+
+    // รอบใหม่ LLM ตอบ different → ปกติจะถอด link นี้ แต่พนักงานยืนยันแล้วห้ามแตะ
+    const report = await buildCustomerLinks(db, { llmProvider: llm("different") });
+    expect(await links.countDocuments({ _id: created!._id })).toBe(1);
+    expect(report.preservedStaff).toBeGreaterThan(0);
+  });
 });
