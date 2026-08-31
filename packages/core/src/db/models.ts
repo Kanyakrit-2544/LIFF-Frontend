@@ -14,6 +14,8 @@ export const COLLECTIONS = {
   purchaseItems: "purchase_items",
   customerIntents: "customer_intents",
   partnerQuarantine: "partner_quarantine",
+  staffReviewDecisions: "staff_review_decisions",
+  statusIncidents: "status_incidents",
 } as const;
 
 export const AI_COLLECTIONS = {
@@ -232,4 +234,32 @@ export interface AuditLogDoc {
   after: Record<string, unknown> | null;
   reason: string | null;
   at: Date;
+}
+
+export interface StaffReviewDecisionDoc {
+  _id: string;
+  kind: "pending_merge";
+  subjectKey: string;
+  customerIds: [string, string];
+  decision: "rejected";
+  decidedBy: "staff";
+  actor: string;
+  reason: string | null;
+  decidedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  schemaVersion: number;
+}
+
+export interface StatusIncidentDoc {
+  _id: string;
+  code: string;
+  severity: "warning" | "critical";
+  status: "open" | "resolved";
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  reportedAt: Date | null;
+  resolvedAt: Date | null;
+  occurrences: number;
+  schemaVersion: number;
 }

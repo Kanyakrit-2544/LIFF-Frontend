@@ -5,6 +5,7 @@ import { log } from "../logger";
 import { buildAttribution, loadMappings, pickMapping, type LeadAttribution } from "./attribution";
 import { mapLead, type LeadConsentField, type MappedLead } from "./mapLead";
 import type { GraphLead, LeadgenNotification } from "./types";
+import { isMergePairRejected } from "../review/pendingMerge";
 
 /**
  * สร้าง/อัปเดตลูกค้าจาก lead ที่ดึงมาจาก Graph API
@@ -65,7 +66,9 @@ export async function upsertFromLead(input: UpsertFromLeadInput): Promise<Upsert
       { $or: orClauses, _id: { $ne: resolved.customerId }, status: "active" },
       { projection: { _id: 1 } }
     );
-    if (other) pendingMergeWith = other._id;
+    if (other && !(await isMergePairRejected(db, resolved.customerId, other._id))) {
+      pendingMergeWith = other._id;
+    }
   }
 
   const set: Record<string, unknown> = {

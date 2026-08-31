@@ -90,6 +90,14 @@ const llmSchema = z.object({
     .transform((value) => value === "true" || value === "1"),
 });
 
+const statusSchema = z.object({
+  STATUS_QUEUE_STALE_MINUTES: z.coerce.number().int().positive().default(15),
+  STATUS_SHEET_STALE_MINUTES: z.coerce.number().int().positive().default(30),
+  STATUS_AI_STALE_MINUTES: z.coerce.number().int().positive().default(30),
+  STATUS_ERROR_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
+  STATUS_ERROR_SPIKE_COUNT: z.coerce.number().int().positive().default(10),
+});
+
 const groups = {
   db: dbSchema,
   ai: aiSchema,
@@ -100,6 +108,7 @@ const groups = {
   partner: partnerSchema,
   facebook: facebookSchema,
   tagger: taggerSchema,
+  status: statusSchema,
 } as const;
 
 type Groups = typeof groups;

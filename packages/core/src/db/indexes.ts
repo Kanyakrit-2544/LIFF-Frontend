@@ -116,6 +116,19 @@ export const INDEX_SPECS: Spec[] = [
       { key: { updatedAt: -1 }, name: "ix_updatedAt" },
     ],
   },
+  {
+    collection: COLLECTIONS.staffReviewDecisions,
+    indexes: [
+      { key: { kind: 1, subjectKey: 1 }, name: "ux_kindSubject", unique: true },
+      { key: { decidedAt: -1 }, name: "ix_decidedAt" },
+    ],
+  },
+  {
+    collection: COLLECTIONS.statusIncidents,
+    indexes: [
+      { key: { status: 1, severity: 1, lastSeenAt: -1 }, name: "ix_statusSeverity" },
+    ],
+  },
 ];
 
 /**

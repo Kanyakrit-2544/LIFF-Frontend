@@ -15,6 +15,8 @@ LINE User ──> LIFF ──> Vercel ───────┘
 Partner ──HMAC API──> Vercel ──> purchases / intents ──scrub──> line_crm_ai
 Facebook Lead Ads ──webhook + Graph API──> customers + attribution
 Legacy DB ──batch scrub──> line_crm_ai ──match + analytics──> insights
+
+Staff ──Google OAuth + allowlist──> /admin/review ──> decisions + audit
 ```
 
 ## เอกสาร
@@ -81,6 +83,9 @@ Legacy DB ──batch scrub──> line_crm_ai ──match + analytics──> in
 | D22 | ค่าของ `channelId` | ใช้ `destination` จาก LINE webhook body |
 | D41 | เตือนเมื่อไร | **เตือนตอนข้อมูลค้างจริง ไม่ใช่ตอน error รายตัว** — error ที่ retry สำเร็จไม่ใช่เรื่องที่คนต้องรู้ (วัดจริง: ~50 error/วัน แต่ dead 0 stuck 0) |
 | D42 | ช่องทางแจ้งเตือน | **ยังไม่เลือก** — ทำชั้นตรวจจับกับหน้าสรุปไว้ก่อน ต่อช่องทางทีหลังเป็นแค่การเพิ่ม sink |
+| D43 | ล็อกอินพนักงาน | **Google OAuth + email allowlist** · session 8 ชั่วโมง · ทุก action ตรวจสิทธิ์ซ้ำฝั่ง server |
+| D44 | Partner quarantine | พนักงาน **แก้ field ที่ผิดแล้วประมวลผล revision ใหม่** · เก็บ payload รุ่นแรกไว้ตรวจย้อนหลัง |
+| D45 | ปฏิเสธ customer merge | **จำคู่ที่ปฏิเสธถาวร** เพื่อไม่ให้ฟอร์มหรือ Facebook Lead ตั้งธงคู่เดิมซ้ำ |
 | D36 | ใครเป็นคนบอกตัวเลข | **aggregation ใน core เท่านั้น** LLM แปลงคำถาม + เขียนสรุปจากตัวเลขที่ได้มาแล้ว |
 | D37 | ข้อมูล synthetic ในรายงาน | ไม่โผล่โดยไม่ได้ขอ (`includeSynthetic: false` เป็นค่าเริ่มต้น) |
 | D38 | เขตเวลาของรายงาน | ตัดวัน/สัปดาห์/เดือนตาม **Asia/Bangkok** เสมอ |
@@ -121,9 +126,12 @@ Legacy DB ──batch scrub──> line_crm_ai ──match + analytics──> in
 - [x] **S11-M3.5 — Partner purchase intake** ✅ HMAC, idempotency, payment/items, intents และ AI mirror
 - [x] **S11-M4 — Analytics + insights** ✅ aggregation 6 แบบ + ตัวกัน LLM แต่งตัวเลข
 - [x] **S11-M6 — Facebook Lead Ads** ✅ โค้ดพร้อม; รอ token และทดสอบกับ Meta จริง
+- [x] **Staff review — `/admin/review`** ✅ 3 คิว, Google OAuth, staff decision และ audit log
+- [x] **Stale-data detection** ✅ คำสั่ง/endpoint ตรวจสถานะ, incident dedupe และ console sink
+- [x] **WF-E diagnostics** ✅ เก็บ error จริงจาก n8n พร้อม redact PII และพิสูจน์กับ workflow ที่พังจริง
 - [ ] **S11-M5 — แสดงประวัติซื้อรายบุคคล** พักไว้จนมีขั้นตอนให้พนักงานยืนยัน `customer_links`
 - [x] Phase 5 — Implementation ตามขอบเขตที่อนุมัติ
-- [x] Phase 6 — Automated tests: **356 ผ่าน** (core 292 + web 64), skipped 0, typecheck ผ่าน
+- [x] Phase 6 — Automated tests: **383 ผ่าน** (core 309 + web 74), skipped 0, typecheck ผ่าน
 - [ ] Production verification — Partner, Facebook และ Hermes/LLM ด้วย credential/ข้อมูลจริง
 
 ## ขอบเขตปัจจุบัน
@@ -136,7 +144,7 @@ Legacy DB ──batch scrub──> line_crm_ai ──match + analytics──> in
 - Facebook Lead Ads → customer + attribution (เปิดใช้งานเมื่อมี credential)
 - AI DB → analytics/insights โดย aggregation เป็นผู้คำนวณตัวเลข
 
-ยังไม่รวมการ import legacy ของจริง, หน้าให้พนักงานยืนยัน merge/link, การแสดงประวัติซื้อรายบุคคล และงานใบกำกับภาษี
+ยังไม่รวมการ import legacy ของจริง, การแสดงประวัติซื้อรายบุคคล และงานใบกำกับภาษี
 
 ## สิ่งที่ยังต้องการจากเจ้าของโปรเจกต์
 
@@ -146,5 +154,14 @@ Legacy DB ──batch scrub──> line_crm_ai ──match + analytics──> in
 4. เตรียม Meta App, Page token และ permission ตาม `docs/28` เพื่อทดสอบ Facebook Lead จริง
 5. เตรียม `LLM_BASE_URL` / `LLM_MODEL` เมื่อจะทดสอบ Hermes กับคำถามภาษาไทยจริง
 6. ตัดสินใจแผน dedupe ก่อน import `raw input/Inner.xlsx` ซึ่งมีลูกค้าซ้ำ
+7. สร้าง Google OAuth Web Client และตั้ง callback `https://<domain>/api/auth/callback/google`
+8. สร้าง `review_user` สำหรับหน้า Admin: อ่าน `line_crm_ai`/`line_crm_legacy` และแก้เฉพาะ `customer_links`; จากนั้นตั้ง `ADMIN_MONGODB_URI` กับ `STAFF_EMAIL_ALLOWLIST`
+
+## หน้าตรวจของพนักงาน
+
+- URL `/admin/review` แบ่งเป็นลูกค้าซ้ำ, ลิงก์ประวัติเก่า และ Partner
+- ถ้า `line_crm_legacy` ยังไม่พร้อม ระบบแสดงรายการแต่ปิดการตัดสิน `customer_links`
+- ทุกการยืนยัน/ปฏิเสธ/แก้ไขเขียน `audit_logs`; logger ยังคงไม่พิมพ์ PII
+- ดูสถานะระบบผ่าน `GET /api/admin/status` หลังล็อกอิน หรือรัน `npm run status:check`
 
 > ห้ามใส่ secret ลง README, source code หรือ commit ให้เก็บใน Vercel Environment Variables และไฟล์ local ที่ gitignore เท่านั้น

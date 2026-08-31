@@ -3,7 +3,7 @@ import type { EnrollmentKind } from "../legacy/courseCell";
 export const PARTNER_SCHEMA_VERSION = 1;
 
 export type PartnerEventType = "purchase" | "purchase.void" | "intent" | "intent.void" | "erase" | "tag";
-export type PartnerEventStatus = "accepted" | "quarantined" | "pending_identity" | "voided";
+export type PartnerEventStatus = "accepted" | "quarantined" | "pending_identity" | "voided" | "rejected";
 export type PartnerResultStatus = PartnerEventStatus | "duplicate" | "rejected";
 
 export interface PartnerSubject {
@@ -25,6 +25,8 @@ export interface PartnerEventDoc {
   reason: string | null;
   customerId: string | null;
   purchaseId: string | null;
+  /** payload รุ่นแรก เก็บไว้ตรวจย้อนหลังเมื่อพนักงานแก้แล้วส่ง revision ใหม่ */
+  originalRaw?: Record<string, unknown> | null;
   raw: Record<string, unknown>;
   schemaVersion: number;
 }
@@ -121,4 +123,3 @@ export interface PartnerEventResult {
   status: PartnerResultStatus;
   reason?: string;
 }
-

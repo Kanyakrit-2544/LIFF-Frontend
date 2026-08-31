@@ -15,7 +15,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const src = $json;\nconst redactString = (v) => String(v ?? '')\n  .replace(/\\+?66[-\\s]?\\d{1,2}[-\\s]?\\d{3}[-\\s]?\\d{4}\\b/g, '[PHONE]')\n  .replace(/\\b0\\d{1,2}[-\\s]?\\d{3}[-\\s]?\\d{4}\\b/g, '[PHONE]')\n  .replace(/\\b[^\\s@,;]+@[^\\s@,;]+\\.[a-z]{2,}\\b/gi, '[EMAIL]')\n  .replace(/Bearer\\s+[^\\s]+/gi, 'Bearer [REDACTED]')\n  .replace(/U[a-fA-F0-9]{20,}/g, '[LINE_USER]');\nreturn [{ json: { payload: { executionId: src.execution?.id ?? null, workflow: src.workflow?.name ?? 'unknown', node: src.execution?.lastNodeExecuted ?? null, message: redactString(src.error?.message ?? 'n8n execution failed') } } }];"
+        "jsCode": "const src = $json;\nconst redactString = (v) => String(v ?? '')\n  .replace(/\\+?66[-\\s]?\\d{1,2}[-\\s]?\\d{3}[-\\s]?\\d{4}\\b/g, '[PHONE]')\n  .replace(/\\b0\\d{1,2}[-\\s]?\\d{3}[-\\s]?\\d{4}\\b/g, '[PHONE]')\n  .replace(/\\b[^\\s@,;]+@[^\\s@,;]+\\.[a-z]{2,}\\b/gi, '[EMAIL]')\n  .replace(/Bearer\\s+[^\\s]+/gi, 'Bearer [REDACTED]')\n  .replace(/\\beyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+/g, '[JWT]')\n  .replace(/\\b\\d[-\\s]?\\d{4}[-\\s]?\\d{5}[-\\s]?\\d{2}[-\\s]?\\d\\b/g, '[NATIONAL_ID]')\n  .replace(/U[a-fA-F0-9]{20,}/g, '[LINE_USER]');\nconst actualError = src.execution?.error ?? src.error ?? {};\nconst message = actualError.message ?? actualError.description ?? actualError.cause?.message ?? 'n8n execution failed';\nreturn [{ json: { payload: { executionId: src.execution?.id ?? null, workflow: src.workflow?.name ?? 'unknown', node: src.execution?.lastNodeExecuted ?? null, message: redactString(message) } } }];"
       },
       "id": "redact-error",
       "name": "Redact",

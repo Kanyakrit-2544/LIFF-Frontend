@@ -77,6 +77,7 @@ function partnerEventDoc(
     occurredAt: event.occurredAt,
     receivedAt: existing?.receivedAt ?? now,
     ...state,
+    originalRaw: existing?.originalRaw ?? (existing ? existing.raw : null),
     raw: event.raw,
     schemaVersion: PARTNER_SCHEMA_VERSION,
   };

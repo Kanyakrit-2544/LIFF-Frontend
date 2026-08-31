@@ -6,6 +6,7 @@ import type { FormSchemaDoc } from "../forms/types";
 
 import { newProfileId } from "../ids";
 import { log } from "../logger";
+import { isMergePairRejected } from "../review/pendingMerge";
 
 /**
  * รับคำตอบจากฟอร์ม LIFF แล้วเขียนลงระบบ (docs/03 §3.6)
@@ -88,7 +89,7 @@ export async function applyFormSubmission(input: ApplyFormInput): Promise<ApplyF
       { phone, status: "active", _id: { $ne: customerId } },
       { projection: { _id: 1 } }
     );
-    if (other) {
+    if (other && !(await isMergePairRejected(db, customerId, other._id))) {
       pendingMergeWith = other._id;
       log.warn("เบอร์ซ้ำกับลูกค้าอีกคน — ตั้งธงรอตรวจสอบ ไม่ merge อัตโนมัติ", {
         customerId, candidateId: other._id, reason: "phone_match",

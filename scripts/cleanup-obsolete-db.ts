@@ -7,7 +7,7 @@
  */
 import { getDb, closeClient } from "../packages/core/src/db/client";
 
-const OBSOLETE_COLLECTIONS = ["pii_tokens", "integrations"];
+const OBSOLETE_COLLECTIONS = ["pii_tokens", "integrations", "__p"];
 
 async function main() {
   const apply = process.argv.includes("--apply");

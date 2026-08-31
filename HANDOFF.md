@@ -13,6 +13,7 @@ Partner → HMAC intake → purchases/intents → partner:scrub → line_crm_ai
 Facebook Lead → webhook เก็บ id → leads:sync → customers + attribution
 Legacy DB → legacy:scrub → line_crm_ai → match:build → customer_links
 line_crm_ai → analytics แบบ deterministic → insights
+Staff → Google OAuth → /admin/review → decisions + audit_logs
 ```
 
 **ใช้งานจริงแล้ว** ทดสอบระบบกรอกฟอร์มผ่าน LINE สำเร็จ
@@ -82,7 +83,7 @@ Codex รายงาน "ผ่าน" มาหลายรอบทั้ง�
 
 - S10 ว่างโดยตั้งใจตาม `docs/05` (งาน PII service ถูกย้าย/พักไว้)
 - M5 restore/แสดงประวัติซื้อรายบุคคลยังพักไว้ เพราะ `customer_links` ต้องให้พนักงานยืนยันก่อน
-- ผลล่าสุด 2026-08-28: 356 tests ผ่าน (core 292 · web 64), skipped 0, typecheck ผ่านทั้ง core/web/scripts
+- ผลล่าสุด 2026-08-31: 383 tests ผ่าน (core 309 · web 74), skipped 0, typecheck ผ่านทั้ง core/web/scripts
 - Partner, Facebook และ Hermes/LLM ยังไม่ได้ยืนยันกับ credential/ข้อมูลจริง
 
 **WF-D เคลียร์แล้ว (2026-08-28)** — import เวอร์ชันใหม่ที่มี `title`/`nameKeys`/`nicknameKey`
@@ -111,8 +112,25 @@ WF-A `Claim Events` 129 · WF-C `Claim Rows` 35 · WF-D `Claim Customers` 5
 สาเหตุน่าจะเป็น Mongo ตอบช้า ~2.2 วิ (Atlas shared tier) + WF-A ยิงทุก 15 วิ → บาง request timeout
 WF-A ยิงวันละ ~5,760 ครั้ง พลาด 129 = 2% ซึ่ง retry รับไหว
 
-⚠️ **log ใช้วินิจฉัยไม่ได้** — ทุกบรรทัดเก็บข้อความเดียวกันว่า `"n8n execution failed"`
-เพราะ node Redact ของ WF-E อ่าน `$json.error.message` ไม่ได้ ต้องแก้ก่อนถึงจะรู้ว่าพังเพราะอะไรจริง
+**WF-E แก้แล้ว (2026-08-31)** — อ่าน `execution.error.message` และ redact PII ต่อ
+พิสูจน์โดยทำให้ WF-A ชี้ host ผิดชั่วคราว: `audit_logs` เก็บชื่อ WF-A, node `Claim Events`
+และสาเหตุ host/domain ไม่ถูกต้องจริง จากนั้นคืน WF-A ตัวจริงแล้ว
+
+**ชั้นตรวจข้อมูลค้างเสร็จแล้ว (D41/D42)**
+- `npm run status:check` และ `GET /api/admin/status`
+- ค่าเริ่มต้น: inbound 15 นาที · Sheet/AI mirror 30 นาที · error spike 10 ครั้งใน 15 นาที
+- `status_incidents` จำปัญหาที่ยังไม่หาย จึงไม่รายงานซ้ำทุกรอบ
+- มีแค่ console/log sink ตาม D42 ยังไม่ต่อ LINE, อีเมล หรือ Slack
+
+**หน้าพนักงานเสร็จในโค้ดแล้ว** — `/admin/review` ครบ 3 คิว: `pendingMerge`, `customer_links`
+และ partner `quarantined`/`pending_identity` · ใช้ Google OAuth + email allowlist · ทุกการกดมี audit
+ยังต้องสร้าง Google OAuth credential และ `review_user` ก่อนเปิดใช้บน Vercel
+
+**กับดัก `env:vercel` แก้แล้ว** — ถ้าไม่ใส่ `--keep-secrets` สคริปต์จะเขียน secret ที่สุ่มใหม่กลับ
+`apps/web/.env.local` และอัปเดต `INTERNAL_HMAC_SECRET` ใน `.env` ของ n8n ด้วย
+หลังรันต้อง restart n8n, วาง `vercel.env.txt` ใน Vercel และรัน AI scrub/mirror ใหม่เมื่อ pepper เปลี่ยน
+
+**ลบ `__p` แล้ว (2026-08-31)** — Atlas dev มี 0 documents; เพิ่มใน cleanup script แบบรันซ้ำได้แล้ว
 
 **Google Sheets layout ปัจจุบัน** มี 22 คอลัมน์ ตัด `สถานะ`/`ช่องทางที่มา` และเพิ่ม `เห็นเราจากช่องทางไหน`
 คำเตือนเรื่อง Vercel ใช้โค้ดเก่าจากรอบก่อนหน้าไม่ใช่สถานะที่ยืนยันได้จาก repository อีกต่อไป
@@ -124,14 +142,11 @@ WF-A ยิงวันละ ~5,760 ครั้ง พลาด 129 = 2% ซ�
 |---|---|
 | **ย้าย n8n ไป VPS องค์กร** | สูงสุด — ปิดเครื่อง = ชีตกับ AI mirror หยุด (ข้อมูลไม่หาย ค้าง `dirty` รอ) |
 | กรอก `TODO` ใน `apps/web/app/privacy/page.tsx` | สูง — ชื่อธุรกิจ + อีเมลติดต่อ |
-| ทำชั้นตรวจจับ "ข้อมูลค้าง" + หน้าสรุปสถานะ (D41) · ยังไม่ต่อช่องทางแจ้งเตือน (D42) | กลาง |
-| แก้ WF-E ให้เก็บข้อความ error จริง — ตอนนี้ทุกบรรทัดขึ้น `"n8n execution failed"` เหมือนกันหมด | กลาง |
 | ตั้ง `LLM_BASE_URL` ชี้ Hermes แล้วลอง `npm run insights:ask -- --question "..."` | กลาง — ชั้น aggregation ใช้ได้แล้วด้วย `--query` |
 | ขอ token Facebook Lead (ดู `docs/28` §10) | กลาง — โค้ดพร้อม ใส่ token แล้วรันได้เลย |
 | ~~ตั้ง Partner secret จริง~~ | ✅ ออกให้แล้ว 2026-08-31 · อยู่ใน `.env.local` + `vercel.env.txt` + `tagger/.env` (fingerprint `26908a1c4a08`) · **ยังต้องวางลง Vercel env แล้ว redeploy** |
-| หน้าให้พนักงานกด merge (`pendingMerge`) | กลาง |
-| หน้าให้พนักงานยืนยัน `customer_links` ก่อนแสดงประวัติซื้อ | กลาง — เป็นเงื่อนไขก่อนทำ M5 |
-| ลบ collection `__p` (ขยะจากสคริปต์ทดสอบ) | ต่ำ |
+| ตั้ง Google OAuth + `review_user` + staff allowlist บน Vercel | กลาง — โค้ดหน้า Admin พร้อมแล้ว |
+| ให้พนักงานเคลียร์ `customer_links` ที่ต้องใช้ ก่อนเริ่ม M5 | กลาง — ต้องมี legacy DB ต้นฉบับ |
 | Presidio scrub จริง | ต่ำ — รอตอนเพิ่มคำถามปลายเปิด |
 | import ไฟล์ลูกค้าเก่า `raw input/Inner.xlsx` | ยังไม่อยู่ในสโคป — 10,998 แถว ลูกค้าซ้ำ 1,648 คน ต้องมีแผน dedupe |
 
@@ -142,6 +157,9 @@ WF-A ยิงวันละ ~5,760 ครั้ง พลาด 129 = 2% ซ�
 - `vercel.env.txt` (gitignored) = env สำหรับวางลง Vercel · สร้างใหม่ `npm run env:vercel -- --domain <d> --keep-secrets`
 - `apps/web/.env.local` = env ตอน dev
 - `.env` ที่รากโปรเจกต์ = env ของ n8n (docker-compose อ่านอัตโนมัติ)
+
+หน้า Admin เพิ่ม `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_SECRET`, `STAFF_EMAIL_ALLOWLIST`,
+`ADMIN_MONGODB_URI`, `AI_MONGODB_DB`, `LEGACY_MONGODB_DB` · ห้ามใช้ `mirror_user` แทน `review_user`
 
 **ห้ามเปลี่ยน** `AI_HASH_PEPPER` (hash ใน AI DB เป็นคนละชุด) · `INTERNAL_HMAC_SECRET` (ต้องตรงกับ n8n)
 
@@ -175,6 +193,9 @@ npm run smoke:partner -- http://localhost:3000
 npm run smoke:facebook -- --url http://localhost:3000
 npm run leads:sync
 npm run insights:ask -- --query '<AnalyticsQuery JSON>'
+npm run status:check
+npm run cleanup:db-obsolete          # dry-run
+npm run cleanup:db-obsolete -- --apply
 
 docker compose up -d
 docker compose stop n8n

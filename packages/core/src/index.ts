@@ -93,6 +93,26 @@ export type { FormSchemaDoc, FormSection, FormField, FieldType, FieldOption, Loc
 export { resolveCustomer, type ResolveCustomerInput, type ResolveCustomerResult } from "./identity/resolve";
 export { resolveLiffCustomer } from "./identity/resolveLiff";
 export { mergeCustomers, pickWinner, type MergeResult } from "./identity/merge";
+export {
+  mergePairKey,
+  isMergePairRejected,
+  rejectPendingMerge,
+  confirmPendingMerge,
+} from "./review/pendingMerge";
+export {
+  listPendingMergeReviews,
+  listCustomerLinkReviews,
+  listPartnerReviews,
+  decideCustomerLink,
+  correctPartnerEvent,
+  rejectPartnerEvent,
+  assignPartnerIdentity,
+  type PendingMergeReviewItem,
+  type CustomerLinkReviewItem,
+  type PartnerReviewItem,
+  type PartnerReviewCandidate,
+  type PartnerCorrection,
+} from "./review/service";
 export { checkRateLimit, ensureRateLimitIndex, type RateLimitResult } from "./security/rateLimit";
 export { applyFormSubmission, type ApplyFormInput, type ApplyFormResult } from "./customers/applyFormSubmission";
 export { toSheetRow, SHEET_COLUMNS, SYSTEM_COLUMNS, HEADERS, COLUMN_IDS, columnLetter, systemRange, type SheetColumn } from "./customers/toSheetRow";
@@ -148,3 +168,18 @@ export { parseQuestion, renderAnswer, PROMPT_VERSION, type ParseOutcome, type Re
 export { saveInsight, ensureInsightIndexes, type InsightDoc } from "./analytics/insights";
 export { forwardChatToTagger, type ForwardResult } from "./events/forwardChat";
 export { eraseCustomer, type EraseResult } from "./partner/erase";
+export {
+  evaluateDataStatus,
+  statusThresholds,
+  type StatusIssue,
+  type StatusSeverity,
+  type StatusThresholds,
+  type SystemStatus,
+} from "./status/evaluate";
+export {
+  ConsoleStatusSink,
+  updateStatusIncidents,
+  type StatusSink,
+  type IncidentUpdateResult,
+} from "./status/incidents";
+export { checkSystemStatus } from "./status/check";

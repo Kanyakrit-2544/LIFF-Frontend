@@ -35,7 +35,8 @@
     "match:build": "tsx --env-file=apps/web/.env.local scripts/build-matches.ts",
     "partner:scrub": "tsx --env-file=apps/web/.env.local scripts/scrub-partner.ts",
     "partner:reconcile": "tsx --env-file=apps/web/.env.local scripts/reconcile-partner.ts",
-    "smoke:partner": "tsx --env-file=apps/web/.env.local scripts/smoke-partner.ts"
+    "smoke:partner": "tsx --env-file=apps/web/.env.local scripts/smoke-partner.ts",
+    "status:check": "tsx --env-file=apps/web/.env.local scripts/status-check.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2",
