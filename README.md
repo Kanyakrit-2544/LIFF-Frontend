@@ -47,7 +47,7 @@ Legacy DB ──batch scrub──> line_crm_ai ──match + analytics──> in
 | 23 | [S11-M2 — Implementation Report](docs/23-s11-m2-report.md) | ผลรันจริง: scrub/verify/idempotency + hash parity |
 | 24 | [S11-M3 — สเปก Match Engine](docs/24-s11-m3-spec.md) | จับคู่ลูกค้า LINE ↔ ประวัติซื้อ, กติกา hash, ขอบเขตที่ LLM เห็นได้ |
 | 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรันจริง + ผลรีวิว (ตรวจ PII ระดับ wire) |
-| 26 | [S11-M3.5 — สัญญาเชื่อมต่อระบบติด Tag](docs/26-purchase-intake-contract.md) | **§A ข้อกำหนดให้ระบบ tag · §B สเปกฝั่งรับ** |
+| 26 | [S11-M3.5 — สัญญาเชื่อมต่อระบบติด Tag](docs/26-purchase-intake-contract.md) | **§A ข้อกำหนดให้ระบบ tag · §B สเปกฝั่งรับ · §D ขอบเขตและการรวมโปรเจกต์** |
 | 27 | [S11-M3.5 — Implementation Report](docs/27-s11-m35-report.md) | ผลรันจริง + ผลรีวิว (ทดสอบด้วย payload ที่จงใจโกหก) |
 | 28 | [S11-M6 — Facebook Lead Ads](docs/28-s11-m6-facebook-lead.md) | webhook, attribution, consent, ผลรันจริง |
 | 29 | [S11-M4 — สเปก Analytics + insights](docs/29-s11-m4-analytics.md) | สูตรที่ถูกต้อง, ขอบเขตของ LLM, ตัวกันโกหก |
