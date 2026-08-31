@@ -67,6 +67,12 @@ const attributionSchema = z.object({
   contentRef: nullableText(300),
 }).strict();
 
+/** คำขอลบข้อมูลส่วนบุคคล (PDPA) — ดู partner/erase.ts */
+const eraseSchema = z.object({
+  reason: z.enum(["customer_request", "legal_request", "other"]).default("customer_request"),
+  requestedAt: z.string().optional(),
+}).strict();
+
 const eventSchema = z.object({
   eventId: text(240),
   type: text(40),
@@ -78,6 +84,7 @@ const eventSchema = z.object({
   voids: text(240).optional(),
   tags: z.array(text(100)).max(100).optional(),
   attribution: attributionSchema.optional(),
+  erase: eraseSchema.optional(),
 }).strict();
 
 export interface ParsedPurchaseLine {
@@ -112,6 +119,7 @@ export interface ParsedPartnerEvent {
     lock: "soft" | "sticky";
   } | null;
   voids: string | null;
+  erase: { reason: string; requestedAt: string | null } | null;
   attribution: PartnerAttribution | null;
   raw: Record<string, unknown>;
 }
@@ -144,7 +152,10 @@ export function parsePartnerEvent(input: unknown): PartnerParseResult {
   if (value.type === "tag" || value.tags !== undefined) {
     return { ok: false, eventId: value.eventId, status: "quarantined", reason: "unsupported_type:tag", raw, meta: { ...meta, type: "tag" } };
   }
-  if (!["purchase", "purchase.void", "intent", "intent.void"].includes(value.type)) {
+  if (value.type === "erase" && !value.subject) {
+    return { ok: false, eventId: value.eventId, status: "rejected", reason: "erase_requires_subject" };
+  }
+  if (!["purchase", "purchase.void", "intent", "intent.void", "erase"].includes(value.type)) {
     return { ok: false, eventId: value.eventId, status: "rejected", reason: `unsupported_type:${value.type}` };
   }
 
@@ -223,6 +234,7 @@ export function parsePartnerEvent(input: unknown): PartnerParseResult {
         lock: value.intent.source === "staff" ? value.intent.lock ?? "soft" : "soft",
       } : null,
       voids: value.voids ?? null,
+      erase: value.erase ? { reason: value.erase.reason, requestedAt: value.erase.requestedAt ?? null } : null,
       attribution: value.attribution ? {
         source: nullish(value.attribution.source),
         adOrOrganic: nullish(value.attribution.adOrOrganic),

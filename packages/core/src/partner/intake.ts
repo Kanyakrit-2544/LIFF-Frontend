@@ -6,6 +6,7 @@ import { courseByCode, courseByHeader, type CourseDef } from "../legacy/courses"
 import { enrollmentCountsAsSeat } from "../legacy/courseCell";
 import { log } from "../logger";
 import { resolvePartnerSubject, type PartnerIdentityResult } from "./identity";
+import { eraseCustomer } from "./erase";
 import { intentRejectionReason, recomputeIntentCurrent } from "./intents";
 import {
   PARTNER_SCHEMA_VERSION,
@@ -304,9 +305,47 @@ async function processVoid(
   return { eventId: event.eventId, status: "accepted" };
 }
 
+/**
+ * คำขอลบข้อมูลส่วนบุคคล (PDPA) — ตัดตัวตนออกจากธุรกรรม ไม่ลบธุรกรรมทิ้ง
+ * รายละเอียดเหตุผลอยู่ใน partner/erase.ts
+ */
+async function processErase(
+  db: Db,
+  partnerId: string,
+  event: ParsedPartnerEvent,
+  identity: PartnerIdentityResult,
+  session: ClientSession,
+  existingEvent: PartnerEventDoc | null,
+  now: Date
+): Promise<PartnerEventResult> {
+  // ไม่รู้ว่าเป็นใคร = ลบไม่ได้ · เดาแล้วลบผิดคนคือความเสียหายที่กู้ไม่ได้
+  if (!identity.customerId) {
+    await replacePartnerEvent(db, partnerEventDoc(existingEvent, partnerId, event, {
+      status: "pending_identity",
+      reason: identity.ambiguous ? "ระบุตัวลูกค้าไม่ได้ชัดเจน — ห้ามลบโดยเดา" : "ยังไม่พบลูกค้าที่ตรงกับ subject",
+      customerId: null, purchaseId: null,
+    }, now), session);
+    return {
+      eventId: event.eventId,
+      status: "pending_identity",
+      reason: identity.ambiguous ? "ambiguous_subject" : "subject_not_found",
+    };
+  }
+
+  const result = await eraseCustomer(db, identity.customerId, event.erase?.reason ?? "customer_request", now, session);
+  await replacePartnerEvent(db, partnerEventDoc(existingEvent, partnerId, event, {
+    status: "accepted", reason: null, customerId: result.customerId, purchaseId: null,
+  }, now), session);
+  return { eventId: event.eventId, status: "accepted" };
+}
+
 async function processAccepted(db: Db, partnerId: string, event: ParsedPartnerEvent): Promise<PartnerEventResult> {
   let identity: PartnerIdentityResult = { customerId: null, evidence: null, ambiguous: false, created: false };
-  if (event.subject) identity = await resolvePartnerSubject(db, event.subject, { createMissingLine: Boolean(event.subject.lineUserId) });
+  if (event.subject) {
+    // erase ห้ามสร้างลูกค้าใหม่เด็ดขาด — ไม่รู้ว่าเป็นใครก็ต้องไม่ลบ ไม่ใช่สร้างคนเปล่า ๆ ขึ้นมาแล้วลบ
+    const createMissingLine = event.type !== "erase" && Boolean(event.subject.lineUserId);
+    identity = await resolvePartnerSubject(db, event.subject, { createMissingLine });
+  }
 
   const lines: { course: CourseDef; line: ParsedPurchaseLine }[] = [];
   if (event.payment) {
@@ -340,6 +379,7 @@ async function processAccepted(db: Db, partnerId: string, event: ParsedPartnerEv
         if (existing && existing.revision >= event.revision) return { eventId: event.eventId, status: "duplicate" as const };
         if (existing && existing.type !== event.type) return { eventId: event.eventId, status: "rejected" as const, reason: "revision_type_change" };
         const now = new Date();
+        if (event.type === "erase") return processErase(db, partnerId, event, identity, session, existing, now);
         if (event.type === "purchase") return processPurchase(db, partnerId, event, identity, lines, session, existing, now);
         if (event.type === "intent") {
           return processIntent(db, partnerId, event, identity, intentCourse ? intentCourse.code : null, session, existing, now);

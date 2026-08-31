@@ -39,7 +39,8 @@ export type IdentityProvider =
   | "legacy_import";
 
 export type CustomerStatus = "lead" | "prospect" | "customer" | "inactive";
-export type RecordStatus = "active" | "merged" | "archived";
+/** erased = ลบข้อมูลส่วนบุคคลตามคำขอแล้ว เหลือแต่ธุรกรรมที่ไม่ชี้ไปหาใคร (PDPA) */
+export type RecordStatus = "active" | "merged" | "archived" | "erased";
 
 export interface CustomerLinkDoc {
   _id: string;
@@ -110,6 +111,10 @@ export interface CustomerDoc {
    * ใครก็พิมพ์เบอร์ของคนอื่นได้ → merge อัตโนมัติ = ยึดบัญชีคนอื่นได้
    */
   pendingMerge: { candidateId: string; reason: string; at: Date } | null;
+
+  /** เวลาที่ลบข้อมูลส่วนบุคคลตามคำขอ (PDPA) — null = ยังไม่เคยถูกขอให้ลบ */
+  erasedAt?: Date | null;
+  eraseReason?: string | null;
 
   /** ที่มาจากโฆษณา/คอนเทนต์ — เติมเมื่อลูกค้ามาจาก Facebook Lead (docs/28) */
   leadAttribution?: {

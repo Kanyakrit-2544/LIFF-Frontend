@@ -2,7 +2,7 @@ import type { EnrollmentKind } from "../legacy/courseCell";
 
 export const PARTNER_SCHEMA_VERSION = 1;
 
-export type PartnerEventType = "purchase" | "purchase.void" | "intent" | "intent.void" | "tag";
+export type PartnerEventType = "purchase" | "purchase.void" | "intent" | "intent.void" | "erase" | "tag";
 export type PartnerEventStatus = "accepted" | "quarantined" | "pending_identity" | "voided";
 export type PartnerResultStatus = PartnerEventStatus | "duplicate" | "rejected";
 

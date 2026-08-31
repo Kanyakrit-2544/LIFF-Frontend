@@ -1,5 +1,6 @@
 import {
   env,
+  forwardChatToTagger,
   log,
   verifyLineSignature,
   redactLineEvents,
@@ -67,6 +68,14 @@ export async function POST(req: Request) {
   const events: LineEvent[] = Array.isArray(body.events) ? body.events : [];
   const channelId = body.destination ?? null;
   if (!channelId) log.warn("LINE webhook ไม่มี destination", { requestId });
+
+  // ── 3.5 ส่งต่อให้ระบบ tag ก่อน redact (docs/26 §D) ──────────────
+  // LINE ตั้ง webhook ได้ channel ละ 1 อัน ระบบ tag ที่ต้องอ่านแชทจึงต้องพึ่งการส่งต่อจากที่นี่
+  // ส่ง byte เดิม + ลายเซ็นเดิม แล้วปล่อยทิ้ง — ระบบนี้ยังไม่เก็บข้อความเหมือนเดิม (D4)
+  // เป็น best-effort ทำหลังตอบ 200 แล้ว ปลายทางล่มไม่กระทบ LINE และไม่กระทบ inbound_events
+  if (events.length > 0) {
+    safeAfter(() => forwardChatToTagger(rawBody, signature), { requestId, target: "tagger" });
+  }
 
   // LINE ยิง events ว่างตอนกดปุ่ม Verify ใน console — ต้องตอบ 200 ไม่งั้นตั้ง webhook ไม่ผ่าน
   if (events.length === 0) {

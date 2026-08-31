@@ -51,6 +51,14 @@ const facebookSchema = z.object({
   FACEBOOK_GRAPH_VERSION: z.string().default("v21.0"),
 });
 
+/**
+ * ส่งต่อ webhook ดิบของ LINE ให้ระบบ tag (docs/26 §D)
+ * optional — ไม่ตั้ง = ไม่ส่งต่อ ระบบทำงานปกติทุกอย่าง
+ */
+const taggerSchema = z.object({
+  TAGGER_FORWARD_URL: z.string().url().optional(),
+});
+
 const n8nSchema = z.object({
   /** dev = false (pull mode) / prod = true — ดู docs/07 */
   N8N_PUSH_ENABLED: z
@@ -91,6 +99,7 @@ const groups = {
   llm: llmSchema,
   partner: partnerSchema,
   facebook: facebookSchema,
+  tagger: taggerSchema,
 } as const;
 
 type Groups = typeof groups;

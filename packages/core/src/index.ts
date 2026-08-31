@@ -146,3 +146,5 @@ export { runAnalytics } from "./analytics/aggregate";
 export { verifyAnswerNumbers, type VerifyResult as AnswerVerifyResult } from "./analytics/verify";
 export { parseQuestion, renderAnswer, PROMPT_VERSION, type ParseOutcome, type RenderOutcome } from "./analytics/ask";
 export { saveInsight, ensureInsightIndexes, type InsightDoc } from "./analytics/insights";
+export { forwardChatToTagger, type ForwardResult } from "./events/forwardChat";
+export { eraseCustomer, type EraseResult } from "./partner/erase";
