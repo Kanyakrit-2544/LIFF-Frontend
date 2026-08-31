@@ -1,7 +1,8 @@
 # LINE CRM Integration Platform — POC → Production
 
-ระบบเก็บข้อมูลลูกค้าจาก LINE OA / LIFF เข้าสู่ MongoDB และแสดงผลใน Google Sheets
-ออกแบบให้ขยายไป Meta / Facebook API และ AI Pipeline ได้โดยไม่ต้องรื้อระบบ
+ระบบรวมข้อมูลลูกค้าจาก LINE OA / LIFF, ระบบขายภายนอก และ Facebook Lead Ads
+เก็บข้อมูลจริงใน MongoDB หลัก แสดงข้อมูลที่พนักงานต้องใช้ใน Google Sheets
+และส่งเฉพาะข้อมูลที่ scrub แล้วไปยังฐาน AI สำหรับจับคู่และวิเคราะห์
 
 ```
 LINE OA ──webhook──> Vercel ──> MongoDB line_crm_dev (Source of Truth)
@@ -10,6 +11,10 @@ LINE User ──> LIFF ──> Vercel ───────┘
                         │
                         └──> n8n ──> Google Sheets (Operational View)
                         └──> n8n WF-D ──> MongoDB line_crm_ai (AI-safe Mirror)
+
+Partner ──HMAC API──> Vercel ──> purchases / intents ──scrub──> line_crm_ai
+Facebook Lead Ads ──webhook + Graph API──> customers + attribution
+Legacy DB ──batch scrub──> line_crm_ai ──match + analytics──> insights
 ```
 
 ## เอกสาร
@@ -30,6 +35,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 11 | [S2 — LINE Webhook](docs/11-s2-webhook.md) | inbound outbox, idempotency, ผลทดสอบ end-to-end |
 | 12 | [S3 — Customer Identity (รีวิว)](docs/12-s3-review.md) | resolve/merge/upsert + บั๊ก 4 จุดที่แก้ |
 | 13 | [S4 — สเปกงาน](docs/13-s4-spec.md) | n8n WF-A: endpoint ที่ต้องสร้าง, workflow node-by-node, เกณฑ์ผ่านงาน |
+| 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 | 15 | [S4 — ผลรีวิว](docs/15-s4-review.md) | บั๊ก 8 จุดที่เจอตอนรัน n8n จริง + ผลทดสอบ |
 | 16 | [S5 — LIFF Auth + Form Schema](docs/16-s5-liff-auth.md) | id_token verify, session cookie, form schema จาก DB |
 | 17 | [S6+S7 — หน้า LIFF + รับข้อมูล](docs/17-s6-s7-liff-form.md) | UI, merge, idempotency, ผลทดสอบจริง |
@@ -46,8 +52,6 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | 28 | [S11-M6 — Facebook Lead Ads](docs/28-s11-m6-facebook-lead.md) | webhook, attribution, consent, ผลรันจริง |
 | 29 | [S11-M4 — สเปก Analytics + insights](docs/29-s11-m4-analytics.md) | สูตรที่ถูกต้อง, ขอบเขตของ LLM, ตัวกันโกหก |
 | 30 | [S11-M4 — Implementation Report](docs/30-s11-m4-report.md) | ผลรันจริง + ตัวเลขที่ cross-check กับ M1 |
-| 25 | [S11-M3 — Implementation Report](docs/25-s11-m3-report.md) | ผลรัน match engine, fixture 25, privacy tests และข้อจำกัด LLM |
-| 14 | [S4 — Implementation Report](docs/14-s4-report.md) | endpoint, workflow export, smoke/integration test result |
 
 ## Design Decisions (ยืนยันแล้ว)
 
@@ -63,7 +67,7 @@ LINE User ──> LIFF ──> Vercel ───────┘
 | D8 | n8n prod | Cloud-hosted — เปลี่ยนแค่ `N8N_PUSH_ENABLED=true` |
 | D9 | Privacy layer | S9: DB หลักเป็น plaintext, AI เห็นเฉพาะ `line_crm_ai` ที่ scrub/mask/hash แล้ว |
 | D10 | หน้าที่ AI | ~~AI match Column ID~~ → **ไม่ใช้ AI** map ตรงจาก `SHEET_COLUMNS` (docs/19) |
-| D11 | AI model | ~~OpenAI~~ → **ไม่ใช้** — ไม่มี AI จึงไม่ต้อง scrub/restore ในเส้นทางนี้ |
+| D11 | AI ใน Sheet sync | **ไม่ใช้** — WF-C map จาก schema โดยตรง; AI ใช้เฉพาะ match/insights บนฐานที่ scrub แล้ว |
 | D12 | restore ก่อนเขียนชีต | ไม่ใช้แล้วใน WF-C — Sheets อ่านจาก Mongo ตรงและเห็นข้อมูลเต็ม |
 | D13 | flow LINE ผ่าน AI ไหม | ❌ ไม่ผ่าน — follow/first_message ไม่มี free text |
 | D14 | deploy `services/pii` | พักไว้จนเริ่ม mirror `customer_profiles` หรือ free text ที่ต้องใช้ Presidio |
@@ -109,21 +113,36 @@ LINE User ──> LIFF ──> Vercel ───────┘
 - [x] **S6+S7 — หน้า LIFF + รับข้อมูลเข้าระบบ + merge** ✅ 159 tests ผ่าน
 - [x] **S8 — Google Sheets sync + WF-C** ✅ 175 tests ผ่าน
 - [x] **S9 — Plaintext DB + AI Mirror + WF-D** ✅ 178 integration tests ผ่านบน Atlas dev
+- [x] **S11-M1 — Legacy mock database** ✅ สร้าง persons/payments/enrollments สำหรับทดสอบได้
 - [x] **S11-M2 — Scrub legacy เข้า AI mirror** ✅ integration + verify ผ่านบน Mongo local
 - [x] **S11-M3 — Match Engine** ✅ fixture 25, deterministic build/verify และ privacy tests ผ่านบน Mongo local
-- [ ] Phase 5 — Implementation (S10 → S11)
-- [ ] Phase 6 — Testing
+- [x] **S11-M3.5 — Partner purchase intake** ✅ HMAC, idempotency, payment/items, intents และ AI mirror
+- [x] **S11-M4 — Analytics + insights** ✅ aggregation 6 แบบ + ตัวกัน LLM แต่งตัวเลข
+- [x] **S11-M6 — Facebook Lead Ads** ✅ โค้ดพร้อม; รอ token และทดสอบกับ Meta จริง
+- [ ] **S11-M5 — แสดงประวัติซื้อรายบุคคล** พักไว้จนมีขั้นตอนให้พนักงานยืนยัน `customer_links`
+- [x] Phase 5 — Implementation ตามขอบเขตที่อนุมัติ
+- [x] Phase 6 — Automated tests: **356 ผ่าน** (core 292 + web 64), skipped 0, typecheck ผ่าน
+- [ ] Production verification — Partner, Facebook และ Hermes/LLM ด้วย credential/ข้อมูลจริง
 
-## ขอบเขตงานนี้
+## ขอบเขตปัจจุบัน
 
-เก็บข้อมูลลูกค้าจาก **การแอดเพื่อน + การทักครั้งแรก** → LIFF form → MongoDB → Google Sheets
+ระบบรองรับ flow ต่อไปนี้แล้ว:
 
-**นอกสโคป (ไว้คิดทีหลัง):** ประวัติการซื้อ/คอร์ส, ข้อมูลการเงิน, ใบกำกับภาษี, การ import ไฟล์ลูกค้าเดิม
+- LINE/LIFF → MongoDB หลัก → Google Sheets + AI-safe mirror
+- Partner API → purchase/payment/items/intents → AI-safe mirror
+- Legacy mock DB → scrub → match engine
+- Facebook Lead Ads → customer + attribution (เปิดใช้งานเมื่อมี credential)
+- AI DB → analytics/insights โดย aggregation เป็นผู้คำนวณตัวเลข
+
+ยังไม่รวมการ import legacy ของจริง, หน้าให้พนักงานยืนยัน merge/link, การแสดงประวัติซื้อรายบุคคล และงานใบกำกับภาษี
 
 ## สิ่งที่ยังต้องการจากเจ้าของโปรเจกต์
 
-1. ยืนยัน[ร่างฟอร์ม LIFF](docs/08-liff-fields-and-sheets.md) — เพิ่ม/ตัด/เปลี่ยน field ได้
-2. LINE Login channel สำหรับ LIFF (Messaging API dev มีค่า local แล้ว)
-3. **`NEXT_PUBLIC_LIFF_ID`** + **LINE Login Channel ID ตัวจริง** (ตอนนี้ซ้ำกับ Messaging API channel — ดู docs/16 §16.5)
-4. เพิ่ม env vars ใน **Vercel** — local (`apps/web/.env.local`) ครบแล้ว แต่ Vercel project ยังว่าง
-4. ตั้ง LINE webhook URL ชี้ Vercel deployment + ปิด auto-reply
+1. กรอกชื่อธุรกิจและอีเมลติดต่อแทน `TODO` ใน `apps/web/app/privacy/page.tsx`
+2. ย้าย n8n จากเครื่อง local ไป VPS องค์กร ก่อนพึ่งพา Sheets/AI mirror ในงานจริงตลอดเวลา
+3. เตรียม Partner HMAC secret จริงและให้ระบบผู้ส่งใช้ secret ชุดเดียวกัน
+4. เตรียม Meta App, Page token และ permission ตาม `docs/28` เพื่อทดสอบ Facebook Lead จริง
+5. เตรียม `LLM_BASE_URL` / `LLM_MODEL` เมื่อจะทดสอบ Hermes กับคำถามภาษาไทยจริง
+6. ตัดสินใจแผน dedupe ก่อน import `raw input/Inner.xlsx` ซึ่งมีลูกค้าซ้ำ
+
+> ห้ามใส่ secret ลง README, source code หรือ commit ให้เก็บใน Vercel Environment Variables และไฟล์ local ที่ gitignore เท่านั้น

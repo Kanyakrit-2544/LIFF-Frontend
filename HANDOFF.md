@@ -9,6 +9,10 @@
 เปิด LIFF → กรอกฟอร์ม → Vercel → MongoDB (plaintext)
 MongoDB → n8n WF-C (2 นาที) → Google Sheet   ← ฝ่ายขายใช้
 MongoDB → n8n WF-D (10 นาที) → line_crm_ai   ← ข้อมูล scrub แล้วสำหรับ AI
+Partner → HMAC intake → purchases/intents → partner:scrub → line_crm_ai
+Facebook Lead → webhook เก็บ id → leads:sync → customers + attribution
+Legacy DB → legacy:scrub → line_crm_ai → match:build → customer_links
+line_crm_ai → analytics แบบ deterministic → insights
 ```
 
 **ใช้งานจริงแล้ว** ทดสอบระบบกรอกฟอร์มผ่าน LINE สำเร็จ
@@ -24,7 +28,7 @@ Next.js 15 (App Router) บน Vercel · MongoDB Atlas · n8n (Docker บนเ�
 
 ## เอกสาร
 
-`README.md` มี index ครบ · `docs/00`–`docs/25` · **`docs/13`** = สเปกที่เขียนให้ Codex เป็นตัวอย่างรูปแบบที่ใช้ได้ผล
+`README.md` มี index ครบ · `docs/00`–`docs/30` · **`docs/13`** = สเปกที่เขียนให้ Codex เป็นตัวอย่างรูปแบบที่ใช้ได้ผล
 
 ## กฎที่ยึดมาตลอด ห้ามละเมิด
 
@@ -53,7 +57,8 @@ Codex รายงาน "ผ่าน" มาหลายรอบทั้ง�
 - `retryOnFail` เป็น property ระดับ node ไม่ใช่ใน `options`
 - workflow JSON ต้องมี `id` ไม่งั้น `n8n import:workflow` พัง
 - `errorWorkflow` ต้องอ้างด้วย id ไม่ใช่ชื่อ
-- **import ทับลบการผูก credential เสมอ** ต้องผูกใหม่ใน UI ทุกครั้ง
+- **import ทับลบการผูก credential เสมอ** — วิธีแก้: ใส่ `id` ของ credential ลงในไฟล์ JSON **ก่อน** import
+  (อ่าน id จาก `.n8n-data/database.sqlite` ตาราง `credentials_entity`) แล้วไม่ต้องเปิด UI เลย · ใช้สำเร็จมาแล้ว 2 ครั้ง
 - MongoDB node cast `_id` เป็น ObjectId เสมอ — `_id` ของเราเป็น ULID ใช้ `customerId` เป็น updateKey แทน
 - claim lock ค้าง 5 นาทีถ้า workflow error กลางคัน → `npm run reset:demo -- --resync` ปลดได้
 
@@ -73,7 +78,12 @@ Codex รายงาน "ผ่าน" มาหลายรอบทั้ง�
 
 ## สถานะปัจจุบัน
 
-**เสร็จแล้ว** S1–S10 + S11 ครบทุกขั้น (M1–M6) · 356 tests ผ่าน (core 292 · web 64) skipped 0 · typecheck ผ่านทั้ง 3 ชุด
+**เสร็จในโค้ดแล้ว** S1–S9 และ S11-M1/M2/M3/M3.5/M4/M6
+
+- S10 ว่างโดยตั้งใจตาม `docs/05` (งาน PII service ถูกย้าย/พักไว้)
+- M5 restore/แสดงประวัติซื้อรายบุคคลยังพักไว้ เพราะ `customer_links` ต้องให้พนักงานยืนยันก่อน
+- ผลล่าสุด 2026-08-28: 356 tests ผ่าน (core 292 · web 64), skipped 0, typecheck ผ่านทั้ง core/web/scripts
+- Partner, Facebook และ Hermes/LLM ยังไม่ได้ยืนยันกับ credential/ข้อมูลจริง
 
 **WF-D เคลียร์แล้ว (2026-08-28)** — import เวอร์ชันใหม่ที่มี `title`/`nameKeys`/`nicknameKey`
 เทคนิค: ใส่ `id` ของ MongoDB credential ลงในไฟล์ JSON **ก่อน** import → credential ไม่หลุด ไม่ต้องผูกใหม่ใน UI
@@ -85,18 +95,9 @@ execution ที่สำเร็จจะไม่ถูกบันทึก 
 เช็คว่าระบบพังจริงไหม ให้ดู **เวลาของ error ล่าสุด** ไม่ใช่จำนวน error
 (เกือบวินิจฉัยผิดว่าทุก workflow กำลังพัง ทั้งที่ error ล่าสุดคือ 07:18 UTC และหลังจากนั้นเดินปกติ)
 
-**⚠️ ค้างอยู่ตอนนี้ — งานแรกที่ต้องทำ**
-
-หัวตารางในชีตอัปเดตเป็น layout ใหม่แล้ว (22 คอลัมน์ ตัด `สถานะ`/`ช่องทางที่มา` เพิ่ม `เห็นเราจากช่องทางไหน`)
-แต่ **Vercel ยังรันโค้ดเก่า** → ถ้า WF-C ทำงานตอนนี้ข้อมูลจะลงผิดคอลัมน์
-
-ลำดับที่ต้องทำ ห้ามสลับ
-1. `docker compose stop n8n`
-2. push + redeploy Vercel รอจนเสร็จ
-3. ลบแถวเก่าในชีต (แถว 2 ลงไป)
-4. `npm run reset:demo -- --resync`
-5. `docker compose up -d`
-6. เช็คว่าแถวใหม่ลงตรงคอลัมน์
+**Google Sheets layout ปัจจุบัน** มี 22 คอลัมน์ ตัด `สถานะ`/`ช่องทางที่มา` และเพิ่ม `เห็นเราจากช่องทางไหน`
+คำเตือนเรื่อง Vercel ใช้โค้ดเก่าจากรอบก่อนหน้าไม่ใช่สถานะที่ยืนยันได้จาก repository อีกต่อไป
+ก่อนล้างหรือ re-sync ชีตจริง ต้องตรวจ deployment และหัวตารางในชีตให้ตรงกันก่อนเสมอ ห้ามเดาจากเอกสารนี้
 
 ## งานที่เหลือ
 
@@ -107,17 +108,18 @@ execution ที่สำเร็จจะไม่ถูกบันทึก 
 | ต่อ WF-E เข้า LINE กลุ่ม (ตอนนี้ error ลง `audit_logs` เฉย ๆ) | กลาง |
 | ตั้ง `LLM_BASE_URL` ชี้ Hermes แล้วลอง `npm run insights:ask -- --question "..."` | กลาง — ชั้น aggregation ใช้ได้แล้วด้วย `--query` |
 | ขอ token Facebook Lead (ดู `docs/28` §10) | กลาง — โค้ดพร้อม ใส่ token แล้วรันได้เลย |
+| ตั้ง Partner secret จริงและทดสอบกับระบบผู้ส่ง | กลาง — ใช้ `PARTNER_HMAC_SECRETS_JSON` แยก secret ต่อ partner |
 | หน้าให้พนักงานกด merge (`pendingMerge`) | กลาง |
+| หน้าให้พนักงานยืนยัน `customer_links` ก่อนแสดงประวัติซื้อ | กลาง — เป็นเงื่อนไขก่อนทำ M5 |
 | ลบ collection `__p` (ขยะจากสคริปต์ทดสอบ) | ต่ำ |
 | Presidio scrub จริง | ต่ำ — รอตอนเพิ่มคำถามปลายเปิด |
-| Meta / Facebook | ต่ำ — `identities` รองรับแล้ว insert เพิ่มได้เลย |
 | import ไฟล์ลูกค้าเก่า `raw input/Inner.xlsx` | ยังไม่อยู่ในสโคป — 10,998 แถว ลูกค้าซ้ำ 1,648 คน ต้องมีแผน dedupe |
 
 ## Secret / credential
 
 **`SECRETS.local.md`** (gitignored) รวมทุกอย่าง — URI ทั้ง 3 Mongo user, ตารางว่า key ไหนห้ามเปลี่ยนเพราะอะไร, LINE channel ID, Google service account
 
-- `vercel.env.txt` (gitignored) = env สำหรับวางลง Vercel 15 ตัว · สร้างใหม่ `npm run env:vercel -- --domain <d> --keep-secrets`
+- `vercel.env.txt` (gitignored) = env สำหรับวางลง Vercel · สร้างใหม่ `npm run env:vercel -- --domain <d> --keep-secrets`
 - `apps/web/.env.local` = env ตอน dev
 - `.env` ที่รากโปรเจกต์ = env ของ n8n (docker-compose อ่านอัตโนมัติ)
 
@@ -146,8 +148,17 @@ npm run legacy:scrub -- --legacy-uri "<uri>" --ai-uri "<uri>" --ai-db line_crm_a
 npm run match:build -- --ai-uri "<uri>" --ai-db line_crm_ai --no-llm
 npm run match:build -- --ai-uri "<uri>" --ai-db line_crm_ai_test --plant 25
 npm run match:build -- --ai-uri "<uri>" --ai-db line_crm_ai_test --verify
+npm run partner:reconcile
+npm run partner:scrub -- --all
+npm run partner:scrub -- --verify
+npm run smoke:partner -- http://localhost:3000
+npm run smoke:facebook -- --url http://localhost:3000
+npm run leads:sync
+npm run insights:ask -- --query '<AnalyticsQuery JSON>'
 
-docker compose up -d / stop n8n / logs -f n8n
+docker compose up -d
+docker compose stop n8n
+docker compose logs -f n8n
 ```
 
 ## URL
