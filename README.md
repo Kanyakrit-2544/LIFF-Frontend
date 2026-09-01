@@ -55,6 +55,7 @@ Staff ──Google OAuth + allowlist──> /admin/review ──> decisions + au
 | 29 | [S11-M4 — สเปก Analytics + insights](docs/29-s11-m4-analytics.md) | สูตรที่ถูกต้อง, ขอบเขตของ LLM, ตัวกันโกหก |
 | 30 | [S11-M4 — Implementation Report](docs/30-s11-m4-report.md) | ผลรันจริง + ตัวเลขที่ cross-check กับ M1 |
 | 31 | [S12 — Go-live & ย้ายไปโครงองค์กร](docs/31-go-live-migration.md) | **จุดสลับ env ทั้งหมด + checklist งานที่เหลือ** |
+| 32 | [S11-M5 — สเปกหน้าโปรไฟล์ลูกค้า](docs/32-s11-m5-spec.md) | แสดงประวัติซื้อรายบุคคล · เฉพาะ confirmed link (D23) |
 
 ## Design Decisions (ยืนยันแล้ว)
 
