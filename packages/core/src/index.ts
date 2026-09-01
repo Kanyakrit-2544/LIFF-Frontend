@@ -113,6 +113,11 @@ export {
   type PartnerReviewCandidate,
   type PartnerCorrection,
 } from "./review/service";
+export {
+  getCustomerProfile,
+  type CustomerProfile,
+  type CustomerPurchaseRow,
+} from "./review/customerProfile";
 export { checkRateLimit, ensureRateLimitIndex, type RateLimitResult } from "./security/rateLimit";
 export { applyFormSubmission, type ApplyFormInput, type ApplyFormResult } from "./customers/applyFormSubmission";
 export { toSheetRow, SHEET_COLUMNS, SYSTEM_COLUMNS, HEADERS, COLUMN_IDS, columnLetter, systemRange, type SheetColumn } from "./customers/toSheetRow";

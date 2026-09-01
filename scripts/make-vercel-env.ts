@@ -63,6 +63,9 @@ const COPY = [
   "AUTH_GOOGLE_ID", "AUTH_GOOGLE_SECRET", "STAFF_EMAIL_ALLOWLIST",
   "PARTNER_HMAC_SECRETS_JSON", "TAGGER_FORWARD_URL",
 ];
+const OPTIONAL_COPY = [
+  "FACEBOOK_PAGE_TOKEN", "FACEBOOK_APP_SECRET", "FACEBOOK_VERIFY_TOKEN", "FACEBOOK_PAGE_ID",
+];
 const DEFAULTS: Record<string, string> = {
   LINE_LOGIN_SCOPES: "openid profile email",
   N8N_PUSH_ENABLED: "false",
@@ -71,6 +74,7 @@ const DEFAULTS: Record<string, string> = {
   MONGODB_BLOCK_COMPRESSOR: "zstd",
   AI_MONGODB_DB: "line_crm_ai",
   LEGACY_MONGODB_DB: "line_crm_legacy",
+  FACEBOOK_GRAPH_VERSION: "v21.0",
 };
 
 const out: Record<string, string> = {};
@@ -81,7 +85,8 @@ for (const k of COPY) {
   if (!v) { missing.push(k); continue; }
   out[k] = v;
 }
-for (const k of ["LINE_LOGIN_SCOPES", "N8N_PUSH_ENABLED"]) out[k] = dev[k] || DEFAULTS[k]!;
+for (const k of OPTIONAL_COPY) if (dev[k]) out[k] = dev[k];
+for (const k of ["LINE_LOGIN_SCOPES", "N8N_PUSH_ENABLED", "FACEBOOK_GRAPH_VERSION"]) out[k] = dev[k] || DEFAULTS[k]!;
 for (const [k, gen] of Object.entries(FRESH)) {
   if (!keepSecrets) {
     out[k] = gen();
@@ -106,7 +111,7 @@ if (!keepSecrets) {
 
 console.log(`✅ เขียน ${OUT} แล้ว (${Object.keys(out).length} ตัวแปร)\n`);
 console.log("คัดลอกมาจาก .env.local:");
-for (const k of COPY) if (out[k]) console.log(`   ${k}`);
+for (const k of [...COPY, ...OPTIONAL_COPY]) if (out[k]) console.log(`   ${k}`);
 console.log(`\n${keepSecrets ? "ใช้ชุดเดิมจาก dev" : "⭐ สร้างใหม่สำหรับ production"}:`);
 for (const k of Object.keys(FRESH)) if (out[k]) console.log(`   ${k}`);
 console.log("\nตั้งจาก --domain:");
