@@ -54,6 +54,7 @@ Staff ──Google OAuth + allowlist──> /admin/review ──> decisions + au
 | 28 | [S11-M6 — Facebook Lead Ads](docs/28-s11-m6-facebook-lead.md) | webhook, attribution, consent, ผลรันจริง |
 | 29 | [S11-M4 — สเปก Analytics + insights](docs/29-s11-m4-analytics.md) | สูตรที่ถูกต้อง, ขอบเขตของ LLM, ตัวกันโกหก |
 | 30 | [S11-M4 — Implementation Report](docs/30-s11-m4-report.md) | ผลรันจริง + ตัวเลขที่ cross-check กับ M1 |
+| 31 | [S12 — Go-live & ย้ายไปโครงองค์กร](docs/31-go-live-migration.md) | **จุดสลับ env ทั้งหมด + checklist งานที่เหลือ** |
 
 ## Design Decisions (ยืนยันแล้ว)
 
