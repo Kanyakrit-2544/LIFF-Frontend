@@ -10,18 +10,27 @@
 
 ค่าเหล่านี้ตอนนี้ชี้ "เครื่องคุณ / บริการชั่วคราว" เมื่อย้ายไปองค์กรให้เปลี่ยนตามคอลัมน์ขวา
 
-### 1.1 n8n — ไฟล์ `line-crm/.env` (docker-compose อ่านอัตโนมัติ)
+### 1.1 n8n — **องค์กร host ให้แล้ว (managed)** ที่ `floatlobe-n8n.wisdomme.co.th`
 
-| ตัวแปร | ตอนนี้ | เมื่อย้ายไป VPS องค์กร |
-|---|---|---|
-| `API_BASE` | `https://liff-frontend-three.vercel.app` | โดเมน production (ถ้าเปลี่ยนโดเมนด้วย) |
-| `MONGODB_URI` | Atlas (app_user) | เหมือนเดิม เว้นแต่ย้าย DB |
-| `MONGODB_MIRROR_URI` | Atlas (mirror_user) | เหมือนเดิม |
-| `INTERNAL_HMAC_SECRET` | ⚠️ ต้องตรงกับ Vercel เป๊ะ | ห้ามเปลี่ยนฝั่งเดียว |
-| ที่ตั้งของ n8n เอง | Docker บนเครื่องคุณ | ย้าย container + `.n8n-data/` ไป VPS · ตั้ง `N8N_PUSH_ENABLED=true` ได้ถ้าอยากลด latency (D8) |
+ไม่ต้องตั้ง VPS เอง · ย้ายจาก n8n บนเครื่อง dev ไป n8n ตัวนี้ = **import workflow + ผูก credential ใหม่ในตัว managed**
 
-**ย้าย n8n**: ก๊อป `.n8n-data/` (มี workflow + credential + encryption key) ไปเครื่องใหม่ · ตั้ง env ชุดเดิม · `docker compose up -d`
-⚠️ `N8N_ENCRYPTION_KEY` ต้องตัวเดิม ไม่งั้น credential ที่เก็บไว้อ่านไม่ออก
+| สิ่งที่ต้องทำบน n8n managed | หมายเหตุ |
+|---|---|
+| import 4 workflow จาก `line-crm/workflows/` (WF-A, C, D, E) | ใส่ `id` ของ credential ในไฟล์ JSON ก่อน import ถ้าทำได้ ไม่งั้นผูก MongoDB credential ใหม่ใน UI |
+| ตั้ง env บน n8n managed | `API_BASE`, `INTERNAL_HMAC_SECRET`, `MONGODB_URI`, `MONGODB_MIRROR_URI` + `NODE_FUNCTION_ALLOW_BUILTIN=crypto` + `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` |
+| `errorWorkflow` ของ WF-A/C/D ชี้ไป WF-E | อ้างด้วย **id** ไม่ใช่ชื่อ |
+| เปลี่ยน trigger เป็น push (ถ้า managed เปิด webhook) | ตั้ง `N8N_PUSH_ENABLED=true` ฝั่ง Vercel + ใส่ URL webhook ของ managed — ไม่บังคับ ยังใช้ pull ได้ |
+
+| ค่าที่ต้องตรงกัน | ห้ามลืม |
+|---|---|
+| `INTERNAL_HMAC_SECRET` | ⚠️ ต้องตรงกับ Vercel เป๊ะ ไม่งั้น n8n ยิง CRM 401 |
+| `AI_HASH_PEPPER` | ต้องเป็นค่าเดิม (ใช้ hash ใน AI DB) |
+
+> **n8n บนเครื่อง dev** (`line-crm/.env` + `.n8n-data/`) เก็บไว้เป็นตัวสำรอง/ทดสอบได้
+> แต่ **ห้ามเปิดพร้อม managed** — สองตัวจะแย่งกัน claim งานจากคิวเดียวกัน (คนละ instance ดึง `inbound_events` ชุดเดียวกัน)
+> เลือกให้ตัวเดียวทำงานกับ Atlas production ณ เวลาหนึ่ง
+
+**⚠️ ย้ายเสร็จต้องปิด n8n เครื่อง dev** — ตอนนี้เครื่อง dev ยิงเข้า production อยู่ ถ้าเปิดทั้งคู่จะประมวลผลซ้ำ
 
 ### 1.2 tagger — ไฟล์ `tagger/.env`
 
@@ -34,7 +43,31 @@
 | `INTENT_PROVIDER` | `stub` | `openai-compatible` **หลังตัดสิน PDPA แล้วเท่านั้น** |
 | `LLM_BASE_URL` | ว่าง | endpoint ของ Hermes องค์กร |
 | `LLM_API_KEY` / `LLM_MODEL` | ว่าง | ตามที่ Hermes กำหนด |
-| ที่ตั้งของ tagger เอง | `localhost:4300` | ต้องมี **URL สาธารณะ** (Docker/PM2 บน VPS) |
+| ที่ตั้งของ tagger เอง | `localhost:4300` | Docker Compose บนเครื่ององค์กร + reverse proxy (§1.5) |
+
+### 1.5 เอา tagger ขึ้นเซิร์ฟเวอร์ (Docker Compose)
+
+tagger มี `Dockerfile` + `docker-compose.yml` แล้ว — ยกทั้งชุด (server + worker + mongo) ด้วยคำสั่งเดียว
+
+```bash
+# บนเครื่ององค์กร
+git clone <repo ของ tagger>   # หรือ copy โฟลเดอร์ไป
+cd tagger
+cp .env.example .env          # แล้วกรอกค่าจริง (ดูตาราง §1.2)
+docker compose up -d          # ได้ server + worker + mongo ครบ
+```
+
+ต้องมีในไฟล์ `.env` อย่างน้อย: `PARTNER_SECRET`, `LINE_CHANNEL_SECRET` (ตรงกับ CRM),
+`CRM_INTAKE_URL=https://liff-frontend-three.vercel.app/api/partner/intake`
+`TAGGER_MONGO_URI` **ไม่ต้องแก้** — compose ตั้งให้ชี้ mongo ในตัวเองอัตโนมัติ
+
+จุดที่ต้องระวัง
+- **รัน 2 process เสมอ** — compose มี `server` (รับแชท) + `worker` (ส่ง outbox เข้า CRM) · ถ้าขาด worker ข้อมูลกองไม่ถูกส่ง
+- **อย่าเปิดพอร์ต 4300 ให้อินเทอร์เน็ตตรง** — วาง reverse proxy + TLS หน้า (เหมือนที่ wisdomme ทำให้ n8n) ให้ได้ URL แบบ `https://tagger.<โดเมนองค์กร>/line/webhook`
+- **Mongo ของ tagger เป็นคนละตัวกับ CRM** (D1/D3) — compose สร้าง volume แยก อย่าชี้ไป Atlas ของ CRM
+- ทดสอบแล้วว่า build + up + รับ webhook (200) ได้จริง (1 ก.ย. 2026)
+
+**พอได้ URL สาธารณะ** → เอาไปใส่ `TAGGER_FORWARD_URL` ใน Vercel → redeploy → แชทเริ่มไหลเข้า tagger
 
 ### 1.3 CRM — Vercel env (แก้ที่ Vercel dashboard หรือ `vercel.env.txt` แล้ว redeploy)
 
@@ -69,7 +102,7 @@
 
 ### 🔴 ความเสี่ยง / กฎหมาย — ทำก่อน
 
-- [ ] **ย้าย n8n ไป VPS องค์กร** (§1.1) — ปิดเครื่อง dev = ชีต + AI mirror หยุด · ข้อมูลไม่หาย ค้าง `dirty` รอ
+- [ ] **ย้าย workflow ไป n8n managed ขององค์กร** (§1.1) — องค์กร host ให้แล้วที่ `floatlobe-n8n.wisdomme.co.th` ไม่ต้องตั้ง VPS เอง · import 4 workflow + ตั้ง env + **ปิด n8n เครื่อง dev** (ห้ามเปิดสองตัวพร้อมกัน จะประมวลผลซ้ำ)
 - [ ] **กรอกชื่อธุรกิจ + อีเมลใน `apps/web/app/privacy/page.tsx`** — หน้า PDPA จริงยังเป็น `TODO`
 - [ ] **ตัดสิน PDPA 4 ข้อ** ก่อนต่อ Hermes อ่านแชท:
   - [ ] เก็บบทสนทนากี่วันแล้วลบ (`CHAT_RETENTION_DAYS` ใน tagger)
@@ -79,7 +112,7 @@
 
 ### 🟠 เปิดใช้งานจริงเต็มระบบ
 
-- [ ] **เอา tagger ขึ้นเซิร์ฟเวอร์องค์กร** → ได้ URL สาธารณะ (ทำคู่กับย้าย n8n)
+- [ ] **เอา tagger ขึ้นเซิร์ฟเวอร์องค์กร** (§1.5) — `docker compose up -d` + reverse proxy → ได้ URL สาธารณะ
 - [ ] **เติม `TAGGER_FORWARD_URL` ใน Vercel** แล้ว redeploy → แชทเริ่มไหลเข้า tagger
 - [ ] **ต่อ Hermes**: ตั้ง `LLM_BASE_URL` + `LLM_MODEL` ทั้งใน `tagger/.env` (`INTENT_PROVIDER=openai-compatible`) และ Vercel (สำหรับ `insights:ask`)
 - [ ] **ขอ token Facebook Lead** ตาม `docs/28` §10 → ใส่ `FACEBOOK_*` ใน Vercel
@@ -109,7 +142,7 @@
 
 ## 4. ลำดับที่แนะนำ
 
-1. **ย้าย n8n + tagger ขึ้น VPS พร้อมกัน** (§1.1, §1.2) — แก้ความเสี่ยงใหญ่สุดและปลดล็อก `TAGGER_FORWARD_URL` ในคราวเดียว
+1. **ย้าย workflow ไป n8n managed** (§1.1) + **เอา tagger ขึ้นเซิร์ฟเวอร์** (§1.5) — n8n ไม่ต้องตั้ง VPS แล้ว (managed) · tagger ขึ้นแล้วปลดล็อก `TAGGER_FORWARD_URL`
 2. **กรอก privacy + ตัดสิน PDPA** — ปลดล็อกการต่อ Hermes
 3. **ต่อ Hermes + Facebook token** — ระบบครบเครื่อง
 4. **ตัดสินข้อมูลเก่า** — ทำให้ตัวเลขเป็นของจริง
