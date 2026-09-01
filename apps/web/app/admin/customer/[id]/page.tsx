@@ -1,5 +1,6 @@
 import { getCustomerProfile, getDb, type CustomerPurchaseRow } from "@line-crm/core";
 import { auth, signOut } from "@/auth";
+import { AdminNav } from "@/app/admin/AdminNav";
 import { isAllowedStaffEmail } from "@/lib/adminAuth";
 import { getAdminReviewDbs } from "@/lib/adminDb";
 import {
@@ -67,6 +68,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         </form>
       </div>
     </header>
+    <AdminNav active="review"/>
 
     {erased && <p className="error-notice"><AlertTriangle size={17}/> ลูกค้ารายนี้ขอลบข้อมูลส่วนบุคคลแล้ว ระบบจึงไม่แสดงชื่อ เบอร์ และอีเมล</p>}
     {profile.hasUnconfirmedLinks && <p className="profile-warning"><AlertTriangle size={18}/><span>มีประวัติที่ระบบเดาว่าอาจเป็นคนนี้แต่ยังไม่ยืนยัน ประวัติส่วนนั้นถูกซ่อนไว้</span><a href="/admin/review?tab=links"><Link2 size={16}/> ไปยืนยันที่แท็บประวัติเก่า</a></p>}
