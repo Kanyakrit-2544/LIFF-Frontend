@@ -56,6 +56,7 @@ Staff ──Google OAuth + allowlist──> /admin/review ──> decisions + au
 | 30 | [S11-M4 — Implementation Report](docs/30-s11-m4-report.md) | ผลรันจริง + ตัวเลขที่ cross-check กับ M1 |
 | 31 | [S12 — Go-live & ย้ายไปโครงองค์กร](docs/31-go-live-migration.md) | **จุดสลับ env ทั้งหมด + checklist งานที่เหลือ** |
 | 32 | [S11-M5 — สเปกหน้าโปรไฟล์ลูกค้า](docs/32-s11-m5-spec.md) | แสดงประวัติซื้อรายบุคคล · เฉพาะ confirmed link (D23) |
+| 34 | [S13 — สเปกหน้า Analytics UI](docs/34-s13-analytics-ui-spec.md) | ดูตัวเลข+ถามภาษาไทยผ่านหน้าเว็บ · ตัวเลขจาก runAnalytics เท่านั้น |
 
 ## Design Decisions (ยืนยันแล้ว)
 
