@@ -69,6 +69,23 @@ docker compose up -d          # ได้ server + worker + mongo ครบ
 
 **พอได้ URL สาธารณะ** → เอาไปใส่ `TAGGER_FORWARD_URL` ใน Vercel → redeploy → แชทเริ่มไหลเข้า tagger
 
+### 1.2.1 ⭐ ตัวเดินงานอัตโนมัติ (workflow ใหม่ WF-F/G/H/I)
+
+งานที่เคยต้องสั่งมือ ตอนนี้มี endpoint + n8n workflow ให้เดินเอง (logic อยู่ใน core ตามกฎ)
+
+| workflow | ทุกกี่นาที | ยิง endpoint | ทำอะไร | ต้อง user |
+|---|---|---|---|---|
+| WF-F | 10 | `/api/internal/leads/sync` | ดึง Facebook lead ที่ค้าง → สร้างลูกค้า | app_user |
+| WF-G | 10 | `/api/internal/partner/scrub` | scrub purchases/intents → line_crm_ai | **mirror_user** |
+| WF-H | 15 | `/api/internal/partner/reconcile` | เติม customerId ให้ purchase ที่ยังไร้เจ้าของ | app_user |
+| WF-I | 30 | `/api/internal/match/build` | จับคู่ลูกค้า สร้าง customer_links (ไม่ใช้ LLM) | **mirror_user** |
+
+- import แบบเดียวกับ WF-A/C/D/E (schedule → sign HMAC → POST) · ไม่ต้องผูก credential (ไม่มี mongo node)
+- ⚠️ **ต้องเพิ่ม `MONGODB_MIRROR_URI` ใน Vercel** เพราะ WF-G/WF-I ให้ CRM เขียน line_crm_ai
+  (endpoint คืน error ชัดถ้าไม่ตั้ง) — อยู่ใน `vercel.env.txt` แล้ว
+- ไม่ตั้ง `FACEBOOK_*` ก็ไม่พัง: WF-F คืน `configured:false` เฉย ๆ
+- WF-F/G/H/I active แล้วบน n8n เมื่อไร ต้อง **ไม่รันสคริปต์ตัวเดียวกันมือซ้อน**
+
 ### 1.3 CRM — Vercel env (แก้ที่ Vercel dashboard หรือ `vercel.env.txt` แล้ว redeploy)
 
 | ตัวแปร | ตอนนี้ | เมื่อพร้อม |

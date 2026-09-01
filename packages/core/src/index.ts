@@ -188,3 +188,5 @@ export {
   type IncidentUpdateResult,
 } from "./status/incidents";
 export { checkSystemStatus } from "./status/check";
+export { syncPendingLeads, type SyncLeadsResult } from "./leads/syncLeads";
+export { scrubPartnerToAi, type PartnerScrubResult } from "./ai/scrubPartnerSync";
