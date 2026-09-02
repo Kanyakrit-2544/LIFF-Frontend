@@ -21,6 +21,8 @@
     "smoke:line": "tsx --env-file=apps/web/.env.local scripts/smoke-line-webhook.ts",
     "smoke:s4": "tsx --env-file=apps/web/.env.local scripts/smoke-s4.ts",
     "seed:form": "tsx --env-file=apps/web/.env.local scripts/seed-form-schema.ts",
+    "seed:local": "tsx --env-file=apps/web/.env.local scripts/seed-local.ts",
+    "seed:demo-atlas": "tsx --env-file=apps/web/.env.local scripts/seed-demo-atlas.ts",
     "env:vercel": "tsx scripts/make-vercel-env.ts",
     "setup:sheet": "tsx --env-file=apps/web/.env.local scripts/setup-sheet.ts",
     "cleanup:db-obsolete": "tsx --env-file=apps/web/.env.local scripts/cleanup-obsolete-db.ts",

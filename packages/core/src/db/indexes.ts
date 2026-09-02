@@ -124,6 +124,13 @@ export const INDEX_SPECS: Spec[] = [
     ],
   },
   {
+    collection: COLLECTIONS.recommendationReviews,
+    indexes: [
+      { key: { customerId: 1, at: -1 }, name: "ix_customerAt" },
+      { key: { status: 1, at: -1 }, name: "ix_statusAt" },
+    ],
+  },
+  {
     collection: COLLECTIONS.statusIncidents,
     indexes: [
       { key: { status: 1, severity: 1, lastSeenAt: -1 }, name: "ix_statusSeverity" },

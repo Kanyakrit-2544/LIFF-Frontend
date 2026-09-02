@@ -15,6 +15,7 @@ export const COLLECTIONS = {
   customerIntents: "customer_intents",
   partnerQuarantine: "partner_quarantine",
   staffReviewDecisions: "staff_review_decisions",
+  recommendationReviews: "recommendation_reviews",
   statusIncidents: "status_incidents",
 } as const;
 
@@ -249,6 +250,21 @@ export interface StaffReviewDecisionDoc {
   createdAt: Date;
   updatedAt: Date;
   schemaVersion: number;
+}
+
+export type RecommendationType = "follow_up" | "upsell";
+
+export interface RecommendationReviewDoc {
+  _id: string;
+  type: RecommendationType;
+  customerId: string;
+  courseCode: string;
+  status: "done" | "skipped";
+  staffEmail: string;
+  at: Date;
+  /** มีเฉพาะรายการทดสอบ เพื่อให้ cleanup ลบได้โดยไม่แตะข้อมูลจริง */
+  seedTag?: string;
+  synthetic?: boolean;
 }
 
 export interface StatusIncidentDoc {

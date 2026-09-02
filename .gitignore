@@ -21,6 +21,7 @@ next-env.d.ts
 vercel.env.txt
 .vercel
 .env*
+!apps/web/.env.local.example
 
 # Google service account (มี private key)
 *.iam.gserviceaccount.json

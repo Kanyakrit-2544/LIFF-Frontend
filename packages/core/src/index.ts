@@ -198,3 +198,22 @@ export {
 export { checkSystemStatus } from "./status/check";
 export { syncPendingLeads, type SyncLeadsResult } from "./leads/syncLeads";
 export { scrubPartnerToAi, type PartnerScrubResult } from "./ai/scrubPartnerSync";
+export { MOCK_COURSE_LADDER, nextCourses } from "./recommend/courseLadder";
+export {
+  buildFollowUpRecommendations,
+  followUpAction,
+  type FollowUpIntent,
+  type FollowUpReco,
+  type PurchasedByCustomer,
+  type RecommendationCustomer,
+} from "./recommend/followUp";
+export {
+  buildCompletedByCustomer,
+  buildUpsellRecommendations,
+  type CompletedByCustomer,
+  type CompletedCourse,
+  type CourseHistoryRow,
+  type CustomerCourseHistory,
+  type UpsellReco,
+} from "./recommend/upsell";
+export { listSalesOpportunities, type SalesOpportunities } from "./recommend/service";

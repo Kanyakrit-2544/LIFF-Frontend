@@ -30,4 +30,10 @@ describe("mask", () => {
     expect(maskEmail("ab@x.com")).toBe("a***@x.com");
     expect(maskEmail(null)).toBe("");
   });
+
+  it("maskEmail ไม่ปล่อยอีเมลที่สองจากเซลล์เดียวกัน", () => {
+    const masked = maskEmail("first@example.com, second@example.com");
+    expect(masked).toBe("fi***@example.com");
+    expect(masked).not.toContain("second");
+  });
 });

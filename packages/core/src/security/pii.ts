@@ -23,10 +23,11 @@ export function maskPhone(phone: string | null | undefined): string {
 
 export function maskEmail(email: string | null | undefined): string {
   if (!email) return "";
-  const at = email.indexOf("@");
-  if (at < 1) return "***";
-  const local = email.slice(0, at);
-  const domain = email.slice(at);
+  const first = email.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
+  if (!first) return "***";
+  const at = first.indexOf("@");
+  const local = first.slice(0, at);
+  const domain = first.slice(at);
   const keep = local.length <= 2 ? 1 : 2;
   return `${local.slice(0, keep)}***${domain}`;
 }

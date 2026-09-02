@@ -9,6 +9,8 @@
     "scripts/build-matches.ts",
     "scripts/scrub-partner.ts",
     "scripts/reconcile-partner.ts",
-    "scripts/smoke-partner.ts"
+    "scripts/smoke-partner.ts",
+    "scripts/seed-local.ts",
+    "scripts/seed-demo-atlas.ts"
   ]
 }
