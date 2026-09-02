@@ -31,6 +31,7 @@
     "smoke:facebook": "tsx --env-file=apps/web/.env.local scripts/smoke-facebook.ts",
     "legacy:profile": "python3 scripts/legacy/profile_xlsx.py \"raw input/Inner.xlsx\" Inner2025 Inner2026",
     "legacy:generate": "tsx --env-file=apps/web/.env.local scripts/generate-legacy-mock.ts",
+    "legacy:import": "tsx --env-file=apps/web/.env.local scripts/import-legacy.ts",
     "legacy:scrub": "tsx --env-file=apps/web/.env.local scripts/scrub-legacy.ts",
     "match:build": "tsx --env-file=apps/web/.env.local scripts/build-matches.ts",
     "partner:scrub": "tsx --env-file=apps/web/.env.local scripts/scrub-partner.ts",

@@ -120,7 +120,7 @@ docker compose up -d          # ได้ server + worker + mongo ครบ
 ### 🔴 ความเสี่ยง / กฎหมาย — ทำก่อน
 
 - [ ] **ย้าย workflow ไป n8n managed ขององค์กร** (§1.1) — องค์กร host ให้แล้วที่ `floatlobe-n8n.wisdomme.co.th` ไม่ต้องตั้ง VPS เอง · import 4 workflow + ตั้ง env + **ปิด n8n เครื่อง dev** (ห้ามเปิดสองตัวพร้อมกัน จะประมวลผลซ้ำ)
-- [ ] **กรอกชื่อธุรกิจ + อีเมลใน `apps/web/app/privacy/page.tsx`** — หน้า PDPA จริงยังเป็น `TODO`
+- [ ] **แทนที่ชื่อธุรกิจ + อีเมลจริงใน `apps/web/app/privacy/page.tsx`** — ตอนนี้ใส่ค่า **mock** ไว้แล้ว (`Inner Power (ชื่อตัวอย่าง)` + `privacy@example.com`) หน้าเรนเดอร์ได้ครบ แต่ต้องเปลี่ยนเป็นของจริงก่อน go-live
 - [ ] **ตัดสิน PDPA 4 ข้อ** ก่อนต่อ Hermes อ่านแชท:
   - [ ] เก็บบทสนทนากี่วันแล้วลบ (`CHAT_RETENTION_DAYS` ใน tagger)
   - [ ] ยอมให้ข้อความออกไป Hermes/ChatGPT ไหม
@@ -137,8 +137,9 @@ docker compose up -d          # ได้ server + worker + mongo ครบ
 
 ### 🟡 ข้อมูลจริง
 
-- [ ] **ตัดสินเรื่องข้อมูลลูกค้าเก่า** — เอา `raw input/Inner.xlsx` เข้าจริงไหม (10,998 แถว) · ถ้าไม่เอา ตัวเลข analytics เป็น synthetic ตลอดไป
-- [ ] ถ้าเอาเข้า: เขียน ETL จากชีตจริง (ตอนนี้ใช้ generator ปั้น synthetic) แล้วรัน `legacy:scrub` กับ Atlas
+- [x] **ETL ชีตจริงเขียนเสร็จแล้ว** — `npm run legacy:import` (Python `extract_rows.py` อ่าน xlsx → core `importLegacyRows` มีเทส 13 เคส → เขียนฐาน legacy, `synthetic:false`, `mode:"real"`) · ทดสอบนำร่อง 30 แถวลง Mongo local สำเร็จ (คน 30 · การชำระ 30 · ที่นั่ง 40 · ยอด 876,550)
+  - ใช้จริง: `npm run legacy:import -- --limit 30 --dry` (ลองก่อน) แล้ว `--uri=... --db=line_crm_legacy` (ตัด `--limit` = ทั้งชีต) · local RS ต้องเติม `/?directConnection=true`
+- [ ] **ตัดสินเรื่องข้อมูลลูกค้าเก่า (PDPA)** — จะ import ของจริงทั้งหมดขึ้น Atlas ไหม · ตอนนี้ import แค่ **local, 30 แถว** เพื่อทดสอบ ยังไม่แตะคลาวด์ · ถ้าเอาเข้าจริง: รัน `legacy:import` (ตัด `--limit`) แล้ว `legacy:scrub` กับ Atlas — **ข้อมูลจริงมี PII ที่ไม่ผ่าน consent LIFF ต้องเคลียร์ฐานทางกฎหมายก่อน**
 
 ### 🟢 งานพัฒนาที่เหลือ (รอเงื่อนไขข้างบน)
 

@@ -44,6 +44,14 @@ export {
   type LegacyAiAckItem,
 } from "./legacy/aiQueue";
 export { legacyMirrorCountsOk, type LegacyMirrorCount } from "./legacy/verify";
+export {
+  importLegacyRows,
+  type LegacyField,
+  type LegacyRawRow,
+  type ImportLegacySheetInput,
+  type ImportLegacyOptions,
+  type ImportedLegacy,
+} from "./legacy/importReal";
 export { decideByRules, type MatchCandidate, type RuleDecision } from "./match/rules";
 export {
   buildMatchCandidates,

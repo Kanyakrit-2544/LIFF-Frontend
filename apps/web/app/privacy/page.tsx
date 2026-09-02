@@ -3,9 +3,10 @@ export const metadata = {
   description: "นโยบายการเก็บและใช้ข้อมูลส่วนบุคคล",
 };
 
-// ⚠️ ช่องที่ต้องกรอกก่อนใช้จริง — ค้นหา TODO ในไฟล์นี้
-const BUSINESS = "TODO: ชื่อธุรกิจ";
-const CONTACT_EMAIL = "TODO: อีเมลติดต่อ";
+// ⚠️ ค่า mock ชั่วคราวสำหรับพัฒนา/ทดสอบ — ต้องแทนที่ด้วยข้อมูลจริงก่อน go-live (ดู docs/31)
+//    example.com เป็นโดเมนสงวนสำหรับตัวอย่าง จงใจให้ไม่ใช่อีเมลจริง
+const BUSINESS = "Inner Power (ชื่อตัวอย่าง — ยังไม่ใช่ข้อมูลจริง)";
+const CONTACT_EMAIL = "privacy@example.com";
 const CONTACT_LINE = "@543zipsl";
 const RETENTION = "2 ปี นับจากการติดต่อครั้งล่าสุด";
 const UPDATED = "27 สิงหาคม 2569";
