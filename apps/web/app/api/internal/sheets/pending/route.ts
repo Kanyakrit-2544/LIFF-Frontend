@@ -2,6 +2,9 @@ import {
   claimDirtyCustomers,
   getDb,
   HEADERS,
+  INTENT_SHEET_HEADERS,
+  INTENT_SHEET_TAB,
+  listIntentSheetReport,
   listSalesReport,
   log,
   SALES_SHEET_HEADERS,
@@ -34,13 +37,17 @@ export async function POST(req: Request) {
   try {
     const mainDb = await getDb();
     const { aiDb, legacyDb } = await getAdminReviewDbs();
-    const salesReport = await listSalesReport(mainDb, aiDb, legacyDb);
+    const [salesReport, intentReport] = await Promise.all([
+      listSalesReport(mainDb, aiDb, legacyDb),
+      listIntentSheetReport(mainDb),
+    ]);
     const salesRows = toSalesSheetRows(salesReport);
     const { claimId, rows } = await claimDirtyCustomers(limit);
     log.info("จองแถวรอซิงก์ชีต", {
       requestId,
       claimed: rows.length,
       salesCustomers: salesReport.summary.totalCustomers,
+      currentIntents: intentReport.values.length - 2,
     });
     return ok(
       {
@@ -54,6 +61,13 @@ export async function POST(req: Request) {
           headers: SALES_SHEET_HEADERS,
           columnCount: SALES_SHEET_HEADERS.length,
           values: salesRows,
+        },
+        intentReport: {
+          tab: INTENT_SHEET_TAB,
+          headers: INTENT_SHEET_HEADERS,
+          columnCount: INTENT_SHEET_HEADERS.length,
+          values: intentReport.values,
+          summary: intentReport.summary,
         },
       },
       requestId

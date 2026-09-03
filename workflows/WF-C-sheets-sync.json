@@ -92,7 +92,7 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ ($json.claimed || 0) + (($json.salesReport?.values || []).length) }}",
+              "leftValue": "={{ ($json.claimed || 0) + (($json.salesReport?.values || []).length) + (($json.intentReport?.values || []).length) }}",
               "rightValue": 0,
               "operator": {
                 "type": "number",
@@ -221,15 +221,42 @@
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $env.GOOGLE_SHEET_ID + '/values/' + encodeURIComponent($('Claim Rows').first().json.intentReport.tab + '!A:G') + ':clear' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Get Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "clear-intent-report",
+      "name": "Clear Intent Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// จับคู่ customerId กับเลขแถว แล้วรวมรายงานสรุปการขายไว้ใน batch เดียวกัน\nconst TAB = 'Customers';\nconst claim = $('Claim Rows').first().json;\nconst SYSTEM_COLS = Number(claim.systemColumnCount);\nconst rows = claim.rows || [];\nconst report = claim.salesReport || {};\n\nconst letter = (i0) => { let n = i0 + 1, out = ''; while (n > 0) { const r = (n - 1) % 26; out = String.fromCharCode(65 + r) + out; n = Math.floor((n - 1) / 26); } return out; };\nconst lastCol = letter(SYSTEM_COLS - 1);\n\nconst keys = ($('Read Keys').first().json.values || []).map((r) => (r && r[0]) || '');\nconst rowOf = new Map();\nkeys.forEach((k, i) => { if (k) rowOf.set(k, i + 2); });\nlet nextRow = keys.length + 2;\n\nconst data = [];\nconst ids = [];\nfor (const r of rows) {\n  const idx = rowOf.has(r.rowKey) ? rowOf.get(r.rowKey) : nextRow++;\n  data.push({ range: `${TAB}!A${idx}:${lastCol}${idx}`, values: [r.values] });\n  ids.push(r.customerId);\n}\nconst reportRows = Array.isArray(report.values) ? report.values : [];\nif (reportRows.length > 0) {\n  const reportTab = String(report.tab || 'สรุปการขาย').replace(/'/g, \"''\");\n  const reportLastCol = letter(Number(report.columnCount || 6) - 1);\n  data.push({ range: `'${reportTab}'!A1:${reportLastCol}${reportRows.length}`, values: reportRows });\n}\nreturn [{ json: { data, ids, count: data.length, hasSalesReport: reportRows.length > 0 } }];"
+        "jsCode": "// จับคู่ customerId กับเลขแถว แล้วรวม snapshot ฝ่ายขายทั้งสองรายงานไว้ใน batch เดียวกัน\nconst TAB = 'Customers';\nconst claim = $('Claim Rows').first().json;\nconst SYSTEM_COLS = Number(claim.systemColumnCount);\nconst rows = claim.rows || [];\nconst report = claim.salesReport || {};\nconst intent = claim.intentReport || {};\n\nconst letter = (i0) => { let n = i0 + 1, out = ''; while (n > 0) { const r = (n - 1) % 26; out = String.fromCharCode(65 + r) + out; n = Math.floor((n - 1) / 26); } return out; };\nconst lastCol = letter(SYSTEM_COLS - 1);\n\nconst keys = ($('Read Keys').first().json.values || []).map((r) => (r && r[0]) || '');\nconst rowOf = new Map();\nkeys.forEach((k, i) => { if (k) rowOf.set(k, i + 2); });\nlet nextRow = keys.length + 2;\n\nconst data = [];\nconst ids = [];\nfor (const r of rows) {\n  const idx = rowOf.has(r.rowKey) ? rowOf.get(r.rowKey) : nextRow++;\n  data.push({ range: `${TAB}!A${idx}:${lastCol}${idx}`, values: [r.values] });\n  ids.push(r.customerId);\n}\nconst reportRows = Array.isArray(report.values) ? report.values : [];\nif (reportRows.length > 0) {\n  const reportTab = String(report.tab || 'สรุปการขาย').replace(/'/g, \"''\");\n  const reportLastCol = letter(Number(report.columnCount || 6) - 1);\n  data.push({ range: `'${reportTab}'!A1:${reportLastCol}${reportRows.length}`, values: reportRows });\n}\nconst intentRows = Array.isArray(intent.values) ? intent.values : [];\nif (intentRows.length > 0) {\n  const intentTab = String(intent.tab || 'Intent').replace(/'/g, \"''\");\n  const intentLastCol = letter(Number(intent.columnCount || 7) - 1);\n  data.push({ range: `'${intentTab}'!A1:${intentLastCol}${intentRows.length}`, values: intentRows });\n}\nreturn [{ json: { data, ids, count: data.length, hasSalesReport: reportRows.length > 0, hasIntentReport: intentRows.length > 0 } }];"
       },
       "id": "plan-writes",
       "name": "Plan Writes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1600,
+        1800,
         0
       ]
     },
@@ -261,7 +288,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1800,
+        2000,
         0
       ],
       "retryOnFail": true,
@@ -279,7 +306,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2000,
+        2200,
         0
       ]
     },
@@ -322,7 +349,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2200,
+        2400,
         0
       ],
       "retryOnFail": true,
@@ -410,6 +437,17 @@
       ]
     },
     "Clear Sales Report": {
+      "main": [
+        [
+          {
+            "node": "Clear Intent Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Intent Report": {
       "main": [
         [
           {

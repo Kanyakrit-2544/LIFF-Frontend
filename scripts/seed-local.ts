@@ -11,6 +11,7 @@ import {
   buildCustomerLinks,
   ensureAiIndexes,
   ensureIndexes,
+  listIntentSheetReport,
   listCustomerLinkReviews,
   listPartnerReviews,
   listPendingMergeReviews,
@@ -367,6 +368,7 @@ function buildPartnerData(customers: CustomerDoc[], now: Date) {
     { _id: "int_LOCAL_003", customerId: customers[32]!._id, courseCode: "PRESENT", status: "hesitant", hesitationReason: "timing_conflict", confidence: 0.74, belowThreshold: false, source: "ai", lock: "soft", model: "local-demo-hermes", observedAt: new Date(now.getTime() - 60_000), supersededAt: null, voidedAt: null, partnerId: PARTNER_ID, sourceEventId: "local-intent-003", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
     { _id: "int_LOCAL_004", customerId: customers[34]!._id, courseCode: "TTRT", status: "hesitant", hesitationReason: null, confidence: 0.62, belowThreshold: false, source: "ai", lock: "soft", model: "local-demo-hermes", observedAt: new Date(now.getTime() - 120_000), supersededAt: null, voidedAt: null, partnerId: PARTNER_ID, sourceEventId: "local-intent-004", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
     { _id: "int_LOCAL_005", customerId: customers[3]!._id, courseCode: "INNER", status: "hesitant", hesitationReason: "budget", confidence: 0.91, belowThreshold: false, source: "ai", lock: "soft", model: "local-demo-hermes", observedAt: now, supersededAt: null, voidedAt: null, partnerId: PARTNER_ID, sourceEventId: "local-intent-005", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
+    { _id: "int_LOCAL_006", customerId: customers[35]!._id, courseCode: "DEEPIN", status: "not_interested", hesitationReason: "not_needed", confidence: 1, belowThreshold: false, source: "staff", lock: "soft", model: null, observedAt: new Date(now.getTime() - 180_000), supersededAt: null, voidedAt: null, partnerId: PARTNER_ID, sourceEventId: "local-intent-006", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
   ];
   const event = (index: number, status: PartnerEventDoc["status"], customer: CustomerDoc, type: PartnerEventDoc["type"], reason: string): PartnerEventDoc & SeedMeta => ({
     _id: `pev_LOCAL_${String(index).padStart(3, "0")}`,
@@ -482,7 +484,7 @@ async function main(): Promise<void> {
       });
     }
 
-    const [merges, links, partnerReviews, customerCount, erasedCount, linkStatuses, eventStatuses, matchedLinks, opportunities, salesReport, storedPosts] = await Promise.all([
+    const [merges, links, partnerReviews, customerCount, erasedCount, linkStatuses, eventStatuses, matchedLinks, opportunities, salesReport, storedPosts, intentSheet] = await Promise.all([
       listPendingMergeReviews(mainDb),
       listCustomerLinkReviews(mainDb, aiDb, legacyDb),
       listPartnerReviews(mainDb),
@@ -503,6 +505,7 @@ async function main(): Promise<void> {
       listSalesOpportunities(mainDb, aiDb, legacyDb, now),
       listSalesReport(mainDb, aiDb, legacyDb),
       mainDb.collection<FacebookPostDoc>(COLLECTIONS.facebookPosts).find({ seedTag: SEED_TAG }).toArray(),
+      listIntentSheetReport(mainDb),
     ]);
     const linkCount = new Map(linkStatuses.map((row) => [row._id, row.count]));
     const eventCount = new Map(eventStatuses.map((row) => [row._id, row.count]));
@@ -522,6 +525,9 @@ async function main(): Promise<void> {
     }
     if (salesReport.summary.newCount < 3 || salesReport.summary.returningCount < 3) {
       throw new Error("ข้อมูล seed ของรายงานการขายต้องมีลูกค้าใหม่และกลับมาซื้ออย่างละอย่างน้อย 3 คน");
+    }
+    if (intentSheet.summary.interested < 1 || intentSheet.summary.hesitant < 1 || intentSheet.summary.notInterested < 1) {
+      throw new Error("ข้อมูล seed ของแท็บ Intent ต้องมีครบทั้งสนใจ ลังเล และไม่สนใจ");
     }
     const marketingSheet = buildMarketingSheetSnapshot(
       await mainDb.collection<CustomerDoc>(COLLECTIONS.customers).find({ _id: { $regex: "^cus_LOCAL_" } }).toArray(),
@@ -557,6 +563,7 @@ async function main(): Promise<void> {
     console.log(`  Analytics            6/6 metric · รวม ${analyticsRows} แถว`);
     console.log(`  โอกาสการขาย          ตามผล ${opportunities.followUps.length} · upsell ${opportunities.upsells.length}`);
     console.log(`  รายงานการขาย          ใหม่ ${salesReport.summary.newCount} · กลับมาซื้อ ${salesReport.summary.returningCount} · รวม ${salesReport.summary.totalCustomers}`);
+    console.log(`  Intent                 สนใจ ${intentSheet.summary.interested} · ลังเล ${intentSheet.summary.hesitant} · ไม่สนใจ ${intentSheet.summary.notInterested}`);
     console.log(`  Facebook posts         ${storedPosts.length} · unmapped ${unmappedPosts} · attribute lead สำเร็จ ${facebookAttribution.resolved} · pending ${facebookAttribution.unresolved}`);
     console.log(`  ชีตการตลาด             Customers ${marketingSheet.counts.customers} · FB Leads ${marketingSheet.counts.leads} · FB Posts ${marketingSheet.counts.posts}`);
     console.log(`  โปรไฟล์ยืนยันแล้ว    ${customerId(0)}, ${customerId(1)}, ${customerId(2)}`);

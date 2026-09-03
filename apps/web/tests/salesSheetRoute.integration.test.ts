@@ -57,6 +57,7 @@ describe.runIf(runIntegration)("POST /api/internal/sheets/pending sales report",
       mainDb.collection<{ _id: string }>(COLLECTIONS.customers).deleteMany({ _id: "cus_sales_route" }),
       mainDb.collection<{ _id: string }>(COLLECTIONS.purchases).deleteMany({ _id: "pur_sales_route" }),
       mainDb.collection<{ purchaseId: string }>(COLLECTIONS.purchaseItems).deleteMany({ purchaseId: "pur_sales_route" }),
+      mainDb.collection<{ _id: string }>(COLLECTIONS.customerIntents).deleteMany({ _id: { $regex: "^int_sales_route" } }),
     ]);
     await mainDb.collection(COLLECTIONS.customers).insertOne({
       _id: "cus_sales_route", displayName: "Route Test", customerStatus: "customer",
@@ -70,6 +71,20 @@ describe.runIf(runIntegration)("POST /api/internal/sheets/pending sales report",
     await mainDb.collection(COLLECTIONS.purchaseItems).insertOne({
       _id: "pit_sales_route", purchaseId: "pur_sales_route", courseCode: "INNER", countsAsSeat: true,
     } as never);
+    await mainDb.collection(COLLECTIONS.customerIntents).insertMany([
+      {
+        _id: "int_sales_route_current", customerId: "cus_sales_route", courseCode: "COMMU",
+        status: "hesitant", hesitationReason: "budget", confidence: 0.8, source: "ai",
+        observedAt: new Date("2026-08-22"), supersededAt: null, voidedAt: null,
+        partnerId: "sales-route-test", sourceEventId: "sales-route-current",
+      },
+      {
+        _id: "int_sales_route_old", customerId: "cus_sales_route", courseCode: "COMMU",
+        status: "interested", hesitationReason: null, confidence: 0.9, source: "ai",
+        observedAt: new Date("2026-08-20"), supersededAt: new Date("2026-08-22"), voidedAt: null,
+        partnerId: "sales-route-test", sourceEventId: "sales-route-old",
+      },
+    ] as never[]);
     await aiDb.collection(AI_COLLECTIONS.customerLinks).insertOne({
       _id: "lnk_sales_route", customerId: "cus_sales_route", legacyPersonId: "lgp_sales_route", status: "confirmed",
     } as never);
@@ -88,11 +103,17 @@ describe.runIf(runIntegration)("POST /api/internal/sheets/pending sales report",
     expect(json.claimed).toBe(0);
     expect(json.salesReport.tab).toBe("สรุปการขาย");
     expect(json.salesReport.values[2]).toEqual(["Route Test", "🔁 กลับมาซื้อ", "INNER", 8_000, 20_000, "2026-08-20"]);
+    expect(json.intentReport.tab).toBe("Intent");
+    expect(json.intentReport.columnCount).toBe(7);
+    expect(json.intentReport.summary).toMatchObject({ interested: 0, hesitant: 1, notInterested: 0 });
+    expect(json.intentReport.values.find((row: unknown[]) => row[0] === "Route Test"))
+      .toEqual(["Route Test", "COMMU", "ลังเล", "งบประมาณ", "80%", "AI", "2026-08-22"]);
 
     await Promise.all([
       mainDb.collection<{ _id: string }>(COLLECTIONS.customers).deleteMany({ _id: "cus_sales_route" }),
       mainDb.collection<{ _id: string }>(COLLECTIONS.purchases).deleteMany({ _id: "pur_sales_route" }),
       mainDb.collection<{ purchaseId: string }>(COLLECTIONS.purchaseItems).deleteMany({ purchaseId: "pur_sales_route" }),
+      mainDb.collection<{ _id: string }>(COLLECTIONS.customerIntents).deleteMany({ _id: { $regex: "^int_sales_route" } }),
     ]);
   });
 });

@@ -284,3 +284,14 @@ export {
   type SalesSheetCell,
 } from "./sales/report";
 export { listSalesReport, type SalesReportRange } from "./sales/service";
+export {
+  buildIntentSheetReport,
+  buildIntentSheetRows,
+  listIntentSheetReport,
+  INTENT_SHEET_HEADERS,
+  INTENT_SHEET_TAB,
+  type IntentSheetCell,
+  type IntentSheetCustomer,
+  type IntentSheetReport,
+  type IntentSheetSummary,
+} from "./sales/intentSheet";

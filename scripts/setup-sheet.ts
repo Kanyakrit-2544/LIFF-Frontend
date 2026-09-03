@@ -3,10 +3,12 @@
  *
  *   npm run setup:sheet
  *
- * สร้าง/อัปเดตแท็บ Customers และสรุปการขาย, ลบแท็บเก่าที่ไม่ได้ใช้, เขียนหัวตารางและป้องกันช่วงระบบ
+ * สร้าง/อัปเดตแท็บ Customers, สรุปการขาย และ Intent, ลบแท็บเก่าที่ไม่ได้ใช้,
+ * เขียนหัวตารางและป้องกันช่วงระบบ
  */
 import { HEADERS, SYSTEM_COLUMNS, columnLetter } from "../packages/core/src/customers/toSheetRow";
 import { SALES_SHEET_HEADERS, SALES_SHEET_TAB } from "../packages/core/src/sales/report";
+import { INTENT_SHEET_HEADERS, INTENT_SHEET_TAB } from "../packages/core/src/sales/intentSheet";
 import { getAccessToken, loadServiceAccount, sheetsApi } from "./lib/googleAuth";
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID ?? "";
@@ -27,7 +29,7 @@ async function main() {
 
   const existing = new Map(meta.sheets.map((s) => [s.properties.title, s.properties.sheetId]));
   const requests: unknown[] = [];
-  for (const title of [DATA_TAB, SALES_SHEET_TAB]) {
+  for (const title of [DATA_TAB, SALES_SHEET_TAB, INTENT_SHEET_TAB]) {
     if (!existing.has(title)) {
       requests.push({ addSheet: { properties: { title } } });
       console.log(`✚ สร้างแท็บ ${title}`);
@@ -50,6 +52,7 @@ async function main() {
   }
   const dataId = after.sheets.find((s) => s.properties.title === DATA_TAB)!.properties.sheetId;
   const salesId = after.sheets.find((s) => s.properties.title === SALES_SHEET_TAB)!.properties.sheetId;
+  const intentId = after.sheets.find((s) => s.properties.title === INTENT_SHEET_TAB)!.properties.sheetId;
 
   // หัวตาราง — เขียนทับทุกครั้งเพื่อให้ตรงกับ SHEET_COLUMNS เสมอ
   const lastCol = columnLetter(HEADERS.length - 1);
@@ -58,9 +61,14 @@ async function main() {
     ["สรุป", "ลูกค้ารวม 0 คน", "🆕 ใหม่ 0 คน", "🔁 กลับมาซื้อ 0 คน", "ยอดใหม่ 0 บาท", "ที่นั่ง 0"],
     [...SALES_SHEET_HEADERS],
   ]);
+  await api.updateValues(`${INTENT_SHEET_TAB}!A1:G2`, [
+    ["สรุป", "สนใจ 0", "ลังเล 0", "ไม่สนใจ 0", "", "", ""],
+    [...INTENT_SHEET_HEADERS],
+  ]);
   console.log(`\n✚ หัวตาราง ${HEADERS.length} คอลัมน์ (A–${lastCol})`);
   console.log(`   ระบบเขียน A–${columnLetter(SYSTEM_COLUMNS.length - 1)} · พนักงานกรอก ${lastCol}`);
   console.log(`✚ แท็บ ${SALES_SHEET_TAB} ${SALES_SHEET_HEADERS.length} คอลัมน์ (ระบบเขียนทั้งหมด)`);
+  console.log(`✚ แท็บ ${INTENT_SHEET_TAB} ${INTENT_SHEET_HEADERS.length} คอลัมน์ (ระบบเขียนทั้งหมด)`);
 
   await api.batchUpdate([
     { updateSheetProperties: { properties: { sheetId: dataId, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } },
@@ -80,6 +88,14 @@ async function main() {
     { addProtectedRange: { protectedRange: {
         range: { sheetId: salesId },
         description: "รายงานสรุปการขาย — ระบบเขียน อ่านอย่างเดียว", warningOnly: true } } },
+    { updateSheetProperties: { properties: { sheetId: intentId, gridProperties: { frozenRowCount: 2 } }, fields: "gridProperties.frozenRowCount" } },
+    { repeatCell: {
+        range: { sheetId: intentId, startRowIndex: 0, endRowIndex: 2 },
+        cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.93, green: 0.95, blue: 0.95 } } },
+        fields: "userEnteredFormat(textFormat,backgroundColor)" } },
+    { addProtectedRange: { protectedRange: {
+        range: { sheetId: intentId },
+        description: "Intent — ระบบเขียน อ่านอย่างเดียว", warningOnly: true } } },
   ]).catch((e) => console.log(`   (ตั้งรูปแบบบางส่วนไม่สำเร็จ: ${(e as Error).message.slice(0, 80)})`));
 
   console.log("\nคอลัมน์:");
