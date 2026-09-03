@@ -1,10 +1,21 @@
-import { claimDirtyCustomers, HEADERS, log, SYSTEM_COLUMNS } from "@line-crm/core";
+import {
+  claimDirtyCustomers,
+  getDb,
+  HEADERS,
+  listSalesReport,
+  log,
+  SALES_SHEET_HEADERS,
+  SALES_SHEET_TAB,
+  SYSTEM_COLUMNS,
+  toSalesSheetRows,
+} from "@line-crm/core";
 import { readSignedJson } from "@/lib/internal";
 import { fail, newRequestId, ok } from "@/lib/http";
+import { getAdminReviewDbs } from "@/lib/adminDb";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 20;
+export const maxDuration = 30;
 
 /**
  * POST /api/internal/sheets/pending  (docs/03 §3.8)
@@ -21,8 +32,16 @@ export async function POST(req: Request) {
   const limit = Number.isFinite(raw) ? Math.max(1, Math.min(Math.floor(raw), 500)) : 200;
 
   try {
+    const mainDb = await getDb();
+    const { aiDb, legacyDb } = await getAdminReviewDbs();
+    const salesReport = await listSalesReport(mainDb, aiDb, legacyDb);
+    const salesRows = toSalesSheetRows(salesReport);
     const { claimId, rows } = await claimDirtyCustomers(limit);
-    log.info("จองแถวรอซิงก์ชีต", { requestId, claimed: rows.length });
+    log.info("จองแถวรอซิงก์ชีต", {
+      requestId,
+      claimed: rows.length,
+      salesCustomers: salesReport.summary.totalCustomers,
+    });
     return ok(
       {
         claimId,
@@ -30,6 +49,12 @@ export async function POST(req: Request) {
         rows,
         headers: HEADERS,
         systemColumnCount: SYSTEM_COLUMNS.length,
+        salesReport: {
+          tab: SALES_SHEET_TAB,
+          headers: SALES_SHEET_HEADERS,
+          columnCount: SALES_SHEET_HEADERS.length,
+          values: salesRows,
+        },
       },
       requestId
     );

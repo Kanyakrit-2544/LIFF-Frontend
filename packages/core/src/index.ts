@@ -217,3 +217,20 @@ export {
   type UpsellReco,
 } from "./recommend/upsell";
 export { listSalesOpportunities, type SalesOpportunities } from "./recommend/service";
+export {
+  buildSalesReport,
+  toSalesSheetRows,
+  SALES_SHEET_HEADERS,
+  SALES_SHEET_TAB,
+  type BuildSalesReportInput,
+  type LegacySalesSummary,
+  type SalesConfirmedLinkInput,
+  type SalesCustomerInput,
+  type SalesCustomerKind,
+  type SalesPurchaseInput,
+  type SalesPurchaseItemInput,
+  type SalesReport,
+  type SalesRow,
+  type SalesSheetCell,
+} from "./sales/report";
+export { listSalesReport, type SalesReportRange } from "./sales/service";

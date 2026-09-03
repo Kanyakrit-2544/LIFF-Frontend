@@ -92,7 +92,7 @@
           "conditions": [
             {
               "id": "c1",
-              "leftValue": "={{ $json.claimed }}",
+              "leftValue": "={{ ($json.claimed || 0) + (($json.salesReport?.values || []).length) }}",
               "rightValue": 0,
               "operator": {
                 "type": "number",
@@ -194,15 +194,42 @@
     },
     {
       "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://sheets.googleapis.com/v4/spreadsheets/' + $env.GOOGLE_SHEET_ID + '/values/' + encodeURIComponent($('Claim Rows').first().json.salesReport.tab + '!A:F') + ':clear' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Get Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "clear-sales-report",
+      "name": "Clear Sales Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// จับคู่ customerId กับเลขแถวในชีต แล้ววางแผนว่าจะเขียนแถวไหนบ้าง\n// ใช้ values:batchUpdate ครั้งเดียวทั้งการแก้แถวเดิมและเพิ่มแถวใหม่\n// (append แยกจะเป็นอีก request และเสี่ยงชนกันเองถ้ามีสอง worker — แต่ claim lock กันไว้แล้ว)\nconst TAB = 'Customers';\nconst SYSTEM_COLS = Number($('Claim Rows').first().json.systemColumnCount);\nconst rows = $('Google Token').first().json.rows || [];\n\nconst letter = (i0) => { let n = i0 + 1, out = ''; while (n > 0) { const r = (n - 1) % 26; out = String.fromCharCode(65 + r) + out; n = Math.floor((n - 1) / 26); } return out; };\nconst lastCol = letter(SYSTEM_COLS - 1);\n\nconst keys = ($('Read Keys').first().json.values || []).map((r) => (r && r[0]) || '');\nconst rowOf = new Map();\nkeys.forEach((k, i) => { if (k) rowOf.set(k, i + 2); });   // แถว 1 เป็นหัวตาราง\nlet nextRow = keys.length + 2;\n\nconst data = [];\nconst ids = [];\nfor (const r of rows) {\n  const idx = rowOf.has(r.rowKey) ? rowOf.get(r.rowKey) : nextRow++;\n  data.push({ range: `${TAB}!A${idx}:${lastCol}${idx}`, values: [r.values] });\n  ids.push(r.customerId);\n}\nreturn [{ json: { data, ids, count: data.length } }];"
+        "jsCode": "// จับคู่ customerId กับเลขแถว แล้วรวมรายงานสรุปการขายไว้ใน batch เดียวกัน\nconst TAB = 'Customers';\nconst claim = $('Claim Rows').first().json;\nconst SYSTEM_COLS = Number(claim.systemColumnCount);\nconst rows = claim.rows || [];\nconst report = claim.salesReport || {};\n\nconst letter = (i0) => { let n = i0 + 1, out = ''; while (n > 0) { const r = (n - 1) % 26; out = String.fromCharCode(65 + r) + out; n = Math.floor((n - 1) / 26); } return out; };\nconst lastCol = letter(SYSTEM_COLS - 1);\n\nconst keys = ($('Read Keys').first().json.values || []).map((r) => (r && r[0]) || '');\nconst rowOf = new Map();\nkeys.forEach((k, i) => { if (k) rowOf.set(k, i + 2); });\nlet nextRow = keys.length + 2;\n\nconst data = [];\nconst ids = [];\nfor (const r of rows) {\n  const idx = rowOf.has(r.rowKey) ? rowOf.get(r.rowKey) : nextRow++;\n  data.push({ range: `${TAB}!A${idx}:${lastCol}${idx}`, values: [r.values] });\n  ids.push(r.customerId);\n}\nconst reportRows = Array.isArray(report.values) ? report.values : [];\nif (reportRows.length > 0) {\n  const reportTab = String(report.tab || 'สรุปการขาย').replace(/'/g, \"''\");\n  const reportLastCol = letter(Number(report.columnCount || 6) - 1);\n  data.push({ range: `'${reportTab}'!A1:${reportLastCol}${reportRows.length}`, values: reportRows });\n}\nreturn [{ json: { data, ids, count: data.length, hasSalesReport: reportRows.length > 0 } }];"
       },
       "id": "plan-writes",
       "name": "Plan Writes",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1400,
+        1600,
         0
       ]
     },
@@ -234,7 +261,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1600,
+        1800,
         0
       ],
       "retryOnFail": true,
@@ -245,14 +272,14 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// batchUpdate สำเร็จทั้งก้อนหรือล้มทั้งก้อน — ไม่มีสถานะรายแถว\nconst upd = $('Write Rows').first().json;\nconst ids = $('Plan Writes').first().json.ids || [];\nconst okCount = Number(upd?.totalUpdatedRows ?? upd?.responses?.length ?? 0);\nconst ok = okCount > 0 || ids.length === 0;\nconst results = ids.map((customerId) => ({ customerId, status: ok ? 'ok' : 'error', error: ok ? undefined : 'batchUpdate ไม่สำเร็จ' }));\n\nconst crypto = require('crypto');\nconst body = JSON.stringify({ results });\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type': 'application/json', 'x-signature': signature, 'x-timestamp': String(ts) } } }];"
+        "jsCode": "// batchUpdate สำเร็จทั้งก้อนหรือล้มทั้งก้อน — ไม่มีสถานะรายแถว\nconst upd = $('Write Rows').first().json;\nconst plan = $('Plan Writes').first().json;\nconst ids = plan.ids || [];\nconst okCount = Number(upd?.totalUpdatedRows ?? upd?.responses?.length ?? 0);\nconst ok = okCount > 0 || plan.count === 0;\nif (!ok && ids.length === 0 && plan.hasSalesReport) throw new Error('เขียนแท็บสรุปการขายไม่สำเร็จ');\nconst results = ids.map((customerId) => ({ customerId, status: ok ? 'ok' : 'error', error: ok ? undefined : 'batchUpdate ไม่สำเร็จ' }));\n\nconst crypto = require('crypto');\nconst body = JSON.stringify({ results });\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type': 'application/json', 'x-signature': signature, 'x-timestamp': String(ts) } } }];"
       },
       "id": "collect-+-sign-ack",
       "name": "Collect + Sign Ack",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1800,
+        2000,
         0
       ]
     },
@@ -295,7 +322,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        2000,
+        2200,
         0
       ],
       "retryOnFail": true,
@@ -372,6 +399,17 @@
       ]
     },
     "Read Keys": {
+      "main": [
+        [
+          {
+            "node": "Clear Sales Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Sales Report": {
       "main": [
         [
           {

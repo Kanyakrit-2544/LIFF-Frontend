@@ -14,6 +14,7 @@ import {
   listPartnerReviews,
   listPendingMergeReviews,
   listSalesOpportunities,
+  listSalesReport,
   runAnalytics,
   scrubCustomer,
   scrubPartnerToAi,
@@ -309,6 +310,7 @@ function buildPartnerData(customers: CustomerDoc[], now: Date) {
     { _id: "pur_LOCAL_004", customerId: customers[8]!._id, partnerId: PARTNER_ID, externalPaymentId: "LOCAL-PAY-004", amount: 15900, currency: "THB", paidAt: previous, year: previous.getUTCFullYear(), month: previous.getUTCMonth() + 1, saleRep: "พนักงานทดลอง A", attribution: null, status: "active", sourceEventId: "local-purchase-004", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
     { _id: "pur_LOCAL_005", customerId: customers[10]!._id, partnerId: PARTNER_ID, externalPaymentId: "LOCAL-PAY-005", amount: 15900, currency: "THB", paidAt: previous, year: previous.getUTCFullYear(), month: previous.getUTCMonth() + 1, saleRep: "พนักงานทดลอง B", attribution: null, status: "active", sourceEventId: "local-purchase-005", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
     { _id: "pur_LOCAL_006", customerId: customers[12]!._id, partnerId: PARTNER_ID, externalPaymentId: "LOCAL-PAY-006", amount: 15900, currency: "THB", paidAt: previous, year: previous.getUTCFullYear(), month: previous.getUTCMonth() + 1, saleRep: "พนักงานทดลอง A", attribution: null, status: "active", sourceEventId: "local-purchase-006", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
+    { _id: "pur_LOCAL_007", customerId: customers[2]!._id, partnerId: PARTNER_ID, externalPaymentId: "LOCAL-PAY-007", amount: 21900, currency: "THB", paidAt: previous, year: previous.getUTCFullYear(), month: previous.getUTCMonth() + 1, saleRep: "พนักงานทดลอง B", attribution: null, status: "active", sourceEventId: "local-purchase-007", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
   ];
   const session = new Date(Date.UTC(year, monthIndex, 20));
   const items: Array<PurchaseItemDoc & SeedMeta> = [
@@ -320,6 +322,7 @@ function buildPartnerData(customers: CustomerDoc[], now: Date) {
     { _id: "pit_LOCAL_006", purchaseId: purchases[3]!._id, customerId: customers[8]!._id, courseCode: "INNER", courseLabel: "Inner", kind: "enrolled", countsAsSeat: true, sessionLabel: "Local sales demo", sessionStart: previous, sessionYear: previous.getUTCFullYear(), createdAt: now, schemaVersion: 1, ...meta },
     { _id: "pit_LOCAL_007", purchaseId: purchases[4]!._id, customerId: customers[10]!._id, courseCode: "INNER", courseLabel: "Inner", kind: "enrolled", countsAsSeat: true, sessionLabel: "Local sales demo", sessionStart: previous, sessionYear: previous.getUTCFullYear(), createdAt: now, schemaVersion: 1, ...meta },
     { _id: "pit_LOCAL_008", purchaseId: purchases[5]!._id, customerId: customers[12]!._id, courseCode: "INNER", courseLabel: "Inner", kind: "enrolled", countsAsSeat: true, sessionLabel: "Local sales demo", sessionStart: previous, sessionYear: previous.getUTCFullYear(), createdAt: now, schemaVersion: 1, ...meta },
+    { _id: "pit_LOCAL_009", purchaseId: purchases[6]!._id, customerId: customers[2]!._id, courseCode: "INNER", courseLabel: "Inner", kind: "enrolled", countsAsSeat: true, sessionLabel: "Local sales returning", sessionStart: previous, sessionYear: previous.getUTCFullYear(), createdAt: now, schemaVersion: 1, ...meta },
   ];
   const intents: Array<CustomerIntentDoc & SeedMeta> = [
     { _id: "int_LOCAL_001", customerId: customers[2]!._id, courseCode: "INNER", status: "interested", hesitationReason: null, confidence: 0.92, belowThreshold: false, source: "ai", lock: "soft", model: "local-demo-hermes", observedAt: now, supersededAt: null, voidedAt: null, partnerId: PARTNER_ID, sourceEventId: "local-intent-001", aiSync: { ...sync }, createdAt: now, updatedAt: now, schemaVersion: 1, ...meta },
@@ -430,7 +433,7 @@ async function main(): Promise<void> {
       });
     }
 
-    const [merges, links, partnerReviews, customerCount, erasedCount, linkStatuses, eventStatuses, matchedLinks, opportunities] = await Promise.all([
+    const [merges, links, partnerReviews, customerCount, erasedCount, linkStatuses, eventStatuses, matchedLinks, opportunities, salesReport] = await Promise.all([
       listPendingMergeReviews(mainDb),
       listCustomerLinkReviews(mainDb, aiDb, legacyDb),
       listPartnerReviews(mainDb),
@@ -449,6 +452,7 @@ async function main(): Promise<void> {
         { projection: { customerId: 1 } }
       ).toArray(),
       listSalesOpportunities(mainDb, aiDb, legacyDb, now),
+      listSalesReport(mainDb, aiDb, legacyDb),
     ]);
     const linkCount = new Map(linkStatuses.map((row) => [row._id, row.count]));
     const eventCount = new Map(eventStatuses.map((row) => [row._id, row.count]));
@@ -465,6 +469,9 @@ async function main(): Promise<void> {
     }
     if (opportunities.followUps.length < 3 || opportunities.upsells.length < 3) {
       throw new Error("ข้อมูล seed ของโอกาสการขายไม่ครบเกณฑ์");
+    }
+    if (salesReport.summary.newCount < 3 || salesReport.summary.returningCount < 3) {
+      throw new Error("ข้อมูล seed ของรายงานการขายต้องมีลูกค้าใหม่และกลับมาซื้ออย่างละอย่างน้อย 3 คน");
     }
 
     const from = "2025-01-01";
@@ -491,6 +498,7 @@ async function main(): Promise<void> {
     console.log(`  ลูกค้า               ${customerCount} คน · erased ${erasedCount}`);
     console.log(`  Analytics            6/6 metric · รวม ${analyticsRows} แถว`);
     console.log(`  โอกาสการขาย          ตามผล ${opportunities.followUps.length} · upsell ${opportunities.upsells.length}`);
+    console.log(`  รายงานการขาย          ใหม่ ${salesReport.summary.newCount} · กลับมาซื้อ ${salesReport.summary.returningCount} · รวม ${salesReport.summary.totalCustomers}`);
     console.log(`  โปรไฟล์ยืนยันแล้ว    ${customerId(0)}, ${customerId(1)}, ${customerId(2)}`);
     console.log(`  โปรไฟล์ erased       ${customerId(38)}, ${customerId(39)}`);
   } finally {
