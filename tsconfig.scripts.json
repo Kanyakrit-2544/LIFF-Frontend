@@ -11,6 +11,8 @@
     "scripts/reconcile-partner.ts",
     "scripts/smoke-partner.ts",
     "scripts/seed-local.ts",
-    "scripts/seed-demo-atlas.ts"
+    "scripts/seed-demo-atlas.ts",
+    "scripts/sync-facebook-posts.ts",
+    "scripts/setup-marketing-sheet.ts"
   ]
 }

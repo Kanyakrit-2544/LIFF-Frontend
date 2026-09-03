@@ -2,7 +2,7 @@ import { auth, signOut } from "@/auth";
 import { AdminNav } from "@/app/admin/AdminNav";
 import { isAllowedStaffEmail } from "@/lib/adminAuth";
 import { getAdminAiDb } from "@/lib/adminDb";
-import { analyticsQuerySchema, createLlmProvider, runAnalytics } from "@line-crm/core";
+import { analyticsQuerySchema, createLlmProvider, getDb, listPostAnalytics, runAnalytics } from "@line-crm/core";
 import { BarChart3, CircleUserRound, LogOut } from "lucide-react";
 import { redirect } from "next/navigation";
 import React from "react";
@@ -33,7 +33,10 @@ export default async function AnalyticsPage() {
   const staffEmail = session?.user?.email ?? "";
   const range = currentBangkokMonth();
   const initialQuery = analyticsQuerySchema.parse({ metric: "revenue", ...range, groupBy: "month" });
-  const initialResult = await runAnalytics(await getAdminAiDb(), initialQuery);
+  const [initialResult, initialPostAnalytics] = await Promise.all([
+    getAdminAiDb().then((db) => runAnalytics(db, initialQuery)),
+    getDb().then((db) => listPostAnalytics(db, range)),
+  ]);
 
   return <main className="admin-shell analytics-page">
     <header className="topbar">
@@ -46,6 +49,11 @@ export default async function AnalyticsPage() {
       </div>
     </header>
     <AdminNav active="analytics"/>
-    <AnalyticsDashboard initialQuery={initialQuery} initialResult={initialResult} llmAvailable={hasLlm()}/>
+    <AnalyticsDashboard
+      initialQuery={initialQuery}
+      initialResult={initialResult}
+      initialPostAnalytics={initialPostAnalytics}
+      llmAvailable={hasLlm()}
+    />
   </main>;
 }

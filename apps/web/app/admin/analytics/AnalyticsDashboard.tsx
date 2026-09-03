@@ -1,8 +1,9 @@
 "use client";
 
-import type { AnalyticsQuery, AnalyticsResult } from "@line-crm/core";
+import type { AnalyticsQuery, AnalyticsResult, PostAnalyticsResult } from "@line-crm/core";
 import { AlertTriangle, BarChart3, Bot, CheckCircle2, Filter, LoaderCircle, Search } from "lucide-react";
 import React, { type FormEvent, useState } from "react";
+import { PostAnalyticsPanel } from "./PostAnalyticsPanel";
 
 const metricOptions: Array<{ value: AnalyticsQuery["metric"]; label: string }> = [
   { value: "revenue", label: "ยอดขาย" },
@@ -42,6 +43,10 @@ function metricValue(metric: string, value: number): string {
 
 function queryResponse(value: unknown): value is AnalyticsResult {
   return Boolean(value && typeof value === "object" && "metric" in value && "rows" in value && "total" in value);
+}
+
+function postAnalyticsResponse(value: unknown): value is PostAnalyticsResult {
+  return Boolean(value && typeof value === "object" && "summary" in value && "rows" in value && "chartMaxEngagement" in value);
 }
 
 interface QuestionResponse {
@@ -111,13 +116,15 @@ export function AnalyticsResultPanel({
   </div>;
 }
 
-export function AnalyticsDashboard({ initialQuery, initialResult, llmAvailable }: {
+export function AnalyticsDashboard({ initialQuery, initialResult, initialPostAnalytics, llmAvailable }: {
   initialQuery: AnalyticsQuery;
   initialResult: AnalyticsResult;
+  initialPostAnalytics: PostAnalyticsResult;
   llmAvailable: boolean;
 }) {
   const [query, setQuery] = useState(initialQuery);
   const [result, setResult] = useState(initialResult);
+  const [postAnalytics, setPostAnalytics] = useState(initialPostAnalytics);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [answerVerified, setAnswerVerified] = useState(false);
@@ -136,6 +143,13 @@ export function AnalyticsDashboard({ initialQuery, initialResult, llmAvailable }
     return payload;
   }
 
+  async function loadPostAnalytics(from: string, to: string): Promise<PostAnalyticsResult> {
+    const response = await fetch(`/api/admin/facebook-posts?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+    const payload = await response.json() as { message?: string };
+    if (!response.ok || !postAnalyticsResponse(payload)) throw new Error(payload.message ?? "โหลดข้อมูลโพสต์ไม่สำเร็จ");
+    return payload;
+  }
+
   async function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -143,9 +157,10 @@ export function AnalyticsDashboard({ initialQuery, initialResult, llmAvailable }
     setAnswer(null);
     setAiIssue(null);
     try {
-      const payload = await post(query);
+      const [payload, posts] = await Promise.all([post(query), loadPostAnalytics(query.from, query.to)]);
       if (!queryResponse(payload)) throw new Error("รูปแบบผลลัพธ์ไม่ถูกต้อง");
       setResult(payload);
+      setPostAnalytics(posts);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "โหลดข้อมูลไม่สำเร็จ");
     } finally {
@@ -169,6 +184,7 @@ export function AnalyticsDashboard({ initialQuery, initialResult, llmAvailable }
       } else if (payload.result && payload.query) {
         setResult(payload.result);
         setQuery(payload.query);
+        setPostAnalytics(await loadPostAnalytics(payload.query.from, payload.query.to));
         setAnswer(payload.answerVerified ? payload.answer ?? null : null);
         setAnswerVerified(payload.answerVerified === true);
         if (!payload.answerVerified) {
@@ -208,5 +224,6 @@ export function AnalyticsDashboard({ initialQuery, initialResult, llmAvailable }
 
     {error && <p className="error-notice"><AlertTriangle size={17}/>{error}</p>}
     <AnalyticsResultPanel result={result} answer={answer} answerVerified={answerVerified} aiIssue={aiIssue}/>
+    <PostAnalyticsPanel result={postAnalytics}/>
   </>;
 }

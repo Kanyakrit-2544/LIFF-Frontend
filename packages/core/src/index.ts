@@ -197,6 +197,56 @@ export {
 } from "./status/incidents";
 export { checkSystemStatus } from "./status/check";
 export { syncPendingLeads, type SyncLeadsResult } from "./leads/syncLeads";
+export {
+  extractFacebookHashtags,
+  courseCodeFromHashtag,
+  mapHashtagsToCourse,
+  FACEBOOK_HASHTAG_COURSES,
+  type HashtagCourseDef,
+  type HashtagCourseResult,
+} from "./facebook/hashtags";
+export { mapFacebookPost } from "./facebook/post";
+export {
+  resolveContentAttribution,
+  type ContentAttributionPost,
+  type ContentFallbackMapping,
+  type ContentAttributionResolution,
+} from "./facebook/attribution";
+export {
+  buildPostAnalytics,
+  type PostAnalyticsRange,
+  type PostAnalyticsResult,
+  type PostAnalyticsRow,
+} from "./facebook/analytics";
+export {
+  createFacebookGraphClient,
+  MetaFacebookGraphClient,
+  type FacebookGraphPort,
+} from "./facebook/graph";
+export {
+  listPostAnalytics,
+  postAnalyticsRange,
+  resolvePendingFacebookAttributions,
+  syncFacebookPosts,
+  type ResolveFacebookAttributionResult,
+  type SyncFacebookPostsResult,
+} from "./facebook/service";
+export {
+  buildMarketingSheetSnapshot,
+  loadMarketingSheetSnapshot,
+  MARKETING_LEAD_HEADERS,
+  MARKETING_POST_HEADERS,
+  MARKETING_SHEET_TABS,
+  type MarketingSheetSnapshot,
+  type MarketingSheetTab,
+} from "./facebook/marketingSheet";
+export {
+  FACEBOOK_POST_SCHEMA_VERSION,
+  type FacebookPostDoc,
+  type FacebookPostEngagement,
+  type GraphFacebookPost,
+  type GraphPostInsights,
+} from "./facebook/models";
 export { scrubPartnerToAi, type PartnerScrubResult } from "./ai/scrubPartnerSync";
 export { MOCK_COURSE_LADDER, nextCourses } from "./recommend/courseLadder";
 export {

@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   signOut: vi.fn(),
   getAdminAiDb: vi.fn(),
+  getDb: vi.fn(),
+  listPostAnalytics: vi.fn(),
   runAnalytics: vi.fn(),
   createLlmProvider: vi.fn(),
   redirect: vi.fn((path: string) => { throw new Error(`redirect:${path}`); }),
@@ -22,11 +24,14 @@ vi.mock("@line-crm/core", async (importOriginal) => ({
   ...await importOriginal<typeof import("@line-crm/core")>(),
   runAnalytics: mocks.runAnalytics,
   createLlmProvider: mocks.createLlmProvider,
+  getDb: mocks.getDb,
+  listPostAnalytics: mocks.listPostAnalytics,
 }));
 
 import AnalyticsPage from "../app/admin/analytics/page";
 import { AnalyticsResultPanel } from "../app/admin/analytics/AnalyticsDashboard";
-import type { AnalyticsResult } from "@line-crm/core";
+import { PostAnalyticsPanel } from "../app/admin/analytics/PostAnalyticsPanel";
+import type { AnalyticsResult, PostAnalyticsResult } from "@line-crm/core";
 
 function result(over: Partial<AnalyticsResult> = {}): AnalyticsResult {
   return {
@@ -48,12 +53,26 @@ function result(over: Partial<AnalyticsResult> = {}): AnalyticsResult {
   };
 }
 
+function postResult(over: Partial<PostAnalyticsResult> = {}): PostAnalyticsResult {
+  return {
+    rows: [{ key: "INNER", courseCode: "INNER", label: "Inner Makeover", postCount: 2,
+      reactions: { total: 8, average: 4 }, comments: { total: 4, average: 2 }, shares: { total: 2, average: 1 },
+      engagement: { total: 14, average: 7 }, reach: { total: 100, average: 50 } }],
+    summary: { totalPosts: 2, mappedPosts: 2, unmappedPosts: 0, totalEngagement: 14, totalReach: 100 },
+    chartMaxEngagement: 14,
+    meta: { from: "2026-08-01", to: "2026-08-31", containsSynthetic: false, generatedAt: "2026-09-01T00:00:00Z" },
+    ...over,
+  };
+}
+
 describe("หน้า /admin/analytics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.STAFF_EMAIL_ALLOWLIST = "staff@example.test";
     mocks.auth.mockResolvedValue({ user: { email: "staff@example.test" } });
     mocks.getAdminAiDb.mockResolvedValue({ name: "ai" });
+    mocks.getDb.mockResolvedValue({ name: "main" });
+    mocks.listPostAnalytics.mockResolvedValue(postResult());
     mocks.runAnalytics.mockResolvedValue(result());
     mocks.createLlmProvider.mockReturnValue(null);
   });
@@ -62,12 +81,14 @@ describe("หน้า /admin/analytics", () => {
     mocks.auth.mockResolvedValue(null);
     await expect(AnalyticsPage()).rejects.toThrow("redirect:/admin/login");
     expect(mocks.getAdminAiDb).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
   });
 
   it("⭐ อีเมลนอก allowlist ถูก redirect ก่อนต่อฐาน", async () => {
     mocks.auth.mockResolvedValue({ user: { email: "outsider@example.test" } });
     await expect(AnalyticsPage()).rejects.toThrow("redirect:/admin/login");
     expect(mocks.getAdminAiDb).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
   });
 
   it("พนักงานที่ได้รับอนุญาตโหลดผลเริ่มต้นผ่าน runAnalytics", async () => {
@@ -93,5 +114,17 @@ describe("หน้า /admin/analytics", () => {
     expect(html).toContain("37.5%");
     expect(html).toContain('viewBox="0 0 999 1"');
     expect(html).toContain('width="7"');
+  });
+
+  it("D49 แสดงตัวเลขและสเกลกราฟโพสต์ที่ core คืนมา พร้อมป้าย unmapped", () => {
+    const base = postResult();
+    const html = renderToStaticMarkup(React.createElement(PostAnalyticsPanel, { result: postResult({
+      rows: [{ ...base.rows[0]!, key: "UNMAPPED", courseCode: null, label: "ยังไม่ map hashtag" }],
+      summary: { ...base.summary, mappedPosts: 0, unmappedPosts: 2 },
+    }) }));
+    expect(html).toContain("มี 2 โพสต์ที่ยัง map hashtag ไม่ได้");
+    expect(html).toContain("ยังไม่ map");
+    expect(html).toContain('viewBox="0 0 14 1"');
+    expect(html).toContain('width="14"');
   });
 });

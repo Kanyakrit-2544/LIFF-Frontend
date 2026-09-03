@@ -1,0 +1,72 @@
+{
+  "id": "wfj-facebook-posts",
+  "name": "WF-J — Facebook Posts Daily Sync",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "wfj-schedule",
+      "name": "Schedule 07:00 Bangkok",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst body = JSON.stringify({ days: 90 });\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type': 'application/json', 'x-signature': signature, 'x-timestamp': String(ts) } } }];"
+      },
+      "id": "wfj-sign",
+      "name": "Sign",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE}}/api/internal/facebook/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "content-type", "value": "={{$json.headers['content-type']}}" },
+            { "name": "x-signature", "value": "={{$json.headers['x-signature']}}" },
+            { "name": "x-timestamp", "value": "={{$json.headers['x-timestamp']}}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}",
+        "options": { "response": { "response": { "neverError": false } } }
+      },
+      "id": "wfj-sync",
+      "name": "Sync Facebook Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "connections": {
+    "Schedule 07:00 Bangkok": { "main": [[{ "node": "Sign", "type": "main", "index": 0 }]] },
+    "Sign": { "main": [[{ "node": "Sync Facebook Posts", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Bangkok",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "errorWorkflow": "wfe-error-handler"
+  }
+}

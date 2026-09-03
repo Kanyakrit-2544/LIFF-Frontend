@@ -136,6 +136,16 @@ export const INDEX_SPECS: Spec[] = [
       { key: { status: 1, severity: 1, lastSeenAt: -1 }, name: "ix_statusSeverity" },
     ],
   },
+  {
+    collection: COLLECTIONS.facebookPosts,
+    indexes: [
+      { key: { postId: 1 }, name: "ux_postId", unique: true },
+      { key: { createdTime: -1 }, name: "ix_createdTime" },
+      { key: { courseCode: 1, createdTime: -1 }, name: "ix_courseCreated" },
+      { key: { adIds: 1 }, name: "ix_adIds" },
+      { key: { unmapped: 1, createdTime: -1 }, name: "ix_unmappedCreated" },
+    ],
+  },
 ];
 
 /**

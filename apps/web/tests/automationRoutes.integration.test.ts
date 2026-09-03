@@ -23,7 +23,7 @@ d("automation trigger endpoints", () => {
 
   it("⭐ ทุก endpoint ปฏิเสธลายเซ็นผิด (401)", async () => {
     const bad = { "content-type": "application/json", "x-signature": "sha256=bad", "x-timestamp": "1" };
-    for (const p of ["/api/internal/leads/sync", "/api/internal/partner/reconcile", "/api/internal/partner/scrub", "/api/internal/match/build"]) {
+    for (const p of ["/api/internal/leads/sync", "/api/internal/partner/reconcile", "/api/internal/partner/scrub", "/api/internal/match/build", "/api/internal/facebook/posts", "/api/internal/sheets/marketing"]) {
       const mod = await import(`../app${p}/route`);
       expect((await mod.POST(req(p, bad))).status, p).toBe(401);
     }
@@ -34,6 +34,24 @@ d("automation trigger endpoints", () => {
     const res = await mod.POST(req("/api/internal/leads/sync", signed('{"limit":10}')));
     expect(res.status).toBe(200);
     expect((await res.json()).configured).toBe(false);
+  });
+
+  it("facebook/posts เซ็นถูก → 200 และปิดเงียบเมื่อยังไม่ตั้ง token", async () => {
+    delete process.env.FACEBOOK_PAGE_TOKEN;
+    delete process.env.FACEBOOK_PAGE_ID;
+    __resetEnvCache();
+    const mod = await import("../app/api/internal/facebook/posts/route");
+    const res = await mod.POST(req("/api/internal/facebook/posts", signed("{}"), "{}"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).configured).toBe(false);
+  });
+
+  it("sheets/marketing เซ็นถูก → snapshot ครบ 3 tab", async () => {
+    const mod = await import("../app/api/internal/sheets/marketing/route");
+    const res = await mod.POST(req("/api/internal/sheets/marketing", signed("{}"), "{}"));
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.tabs.map((tab: { name: string }) => tab.name)).toEqual(["Customers", "FB Leads", "FB Posts"]);
   });
 
   it("partner/reconcile เซ็นถูก → 200", async () => {

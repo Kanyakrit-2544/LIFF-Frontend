@@ -7,6 +7,7 @@ import {
   COLLECTIONS,
   METRICS,
   analyticsQuerySchema,
+  buildMarketingSheetSnapshot,
   buildCustomerLinks,
   ensureAiIndexes,
   ensureIndexes,
@@ -15,12 +16,15 @@ import {
   listPendingMergeReviews,
   listSalesOpportunities,
   listSalesReport,
+  mapFacebookPost,
+  resolvePendingFacebookAttributions,
   runAnalytics,
   scrubCustomer,
   scrubPartnerToAi,
   type CustomerDoc,
   type CustomerIntentDoc,
   type CustomerLinkDoc,
+  type FacebookPostDoc,
   type PartnerEventDoc,
   type PurchaseDoc,
   type PurchaseItemDoc,
@@ -130,6 +134,7 @@ async function cleanSeed(mainDb: Db, aiDb: Db, legacyDb: Db): Promise<void> {
     mainDb.collection(COLLECTIONS.auditLogs).deleteMany({ customerId: { $in: ids } }),
     mainDb.collection(COLLECTIONS.staffReviewDecisions).deleteMany({ customerIds: { $in: ids } }),
     mainDb.collection(COLLECTIONS.recommendationReviews).deleteMany({ seedTag: SEED_TAG }),
+    mainDb.collection<FacebookPostDoc>(COLLECTIONS.facebookPosts).deleteMany({ seedTag: SEED_TAG }),
     mainDb.collection(COLLECTIONS.partnerEvents).deleteMany({ partnerId: PARTNER_ID }),
     mainDb.collection(COLLECTIONS.partnerQuarantine).deleteMany({ partnerId: PARTNER_ID }),
     mainDb.collection(COLLECTIONS.customerIntents).deleteMany({ partnerId: PARTNER_ID }),
@@ -233,6 +238,14 @@ function buildCustomers(legacyPeople: LegacyPersonDoc[], now: Date): Array<Custo
       : `merge${String(pairBase + 1).padStart(2, "0")}@local.example`);
     const interactionAt = new Date(now.getTime() - index * 86_400_000);
     const candidateIndex = pendingPairs.get(index);
+    const pendingFacebook = index === 30 || index === 33 || index === 36;
+    const facebookAdId = index === 30
+      ? "local-content-ad-inner"
+      : index === 33
+        ? "local-content-ad-commu"
+        : index === 36
+          ? "local-content-ad-unmapped"
+          : `local-ad-${index % 2}`;
     return {
       _id: customerId(index),
       status: erased ? "erased" : "active",
@@ -274,11 +287,11 @@ function buildCustomers(legacyPeople: LegacyPersonDoc[], now: Date): Array<Custo
       leadAttribution: index % 3 === 0 ? {
         pageId: "local-page",
         formId: "local-form",
-        adId: `local-ad-${index % 2}`,
-        courseCode: index % 2 === 0 ? "INNER" : "COMMU",
+        adId: facebookAdId,
+        courseCode: pendingFacebook ? null : index % 2 === 0 ? "INNER" : "COMMU",
         campaignName: "Local Demo Campaign",
-        adOrOrganic: index % 2 === 0 ? "ad" : "organic",
-        attributionPending: false,
+        adOrOrganic: pendingFacebook || index % 2 === 0 ? "ad" : "organic",
+        attributionPending: pendingFacebook,
         capturedAt: interactionAt,
       } : null,
       sheetSync: { dirty: false, rowKey: customerId(index), syncedAt: now, lockedAt: null, attempts: 0 },
@@ -293,6 +306,30 @@ function buildCustomers(legacyPeople: LegacyPersonDoc[], now: Date): Array<Custo
       seedTag: SEED_TAG,
       synthetic: true,
     };
+  });
+}
+
+function buildFacebookPosts(now: Date): Array<FacebookPostDoc & SeedMeta> {
+  const inputs = [
+    { id: "post_LOCAL_INNER", message: "เปิดรอบใหม่ #InnerMakeover", daysAgo: 4, reactions: 120, comments: 18, shares: 9 },
+    { id: "post_LOCAL_COMMU", message: "สื่อสารอย่างมั่นใจ #Communication", daysAgo: 9, reactions: 84, comments: 11, shares: 5 },
+    { id: "post_LOCAL_PRESENT", message: "เล่าเรื่องบนเวที #Presentation", daysAgo: 16, reactions: 67, comments: 7, shares: 4 },
+    { id: "post_LOCAL_UNMAPPED", message: "กิจกรรมประจำเดือน #WisdomCommunity", daysAgo: 2, reactions: 31, comments: 3, shares: 2 },
+  ];
+  return inputs.map((input) => {
+    const mapped = mapFacebookPost({
+      id: input.id,
+      message: input.message,
+      created_time: new Date(now.getTime() - input.daysAgo * 86_400_000).toISOString(),
+      permalink_url: `https://www.facebook.com/local/posts/${input.id}`,
+      reactions: { summary: { total_count: input.reactions } },
+      comments: { summary: { total_count: input.comments } },
+      shares: { count: input.shares },
+    }, {
+      data: [{ name: "post_impressions_unique", values: [{ value: input.reactions * 12 }] }],
+    }, now);
+    if (!mapped) throw new Error(`สร้าง Facebook post ตัวอย่าง ${input.id} ไม่สำเร็จ`);
+    return { ...mapped, seedTag: SEED_TAG, synthetic: true };
   });
 }
 
@@ -406,6 +443,18 @@ async function main(): Promise<void> {
     const matchPeople = await pickUniquePhonePeople(legacyDb, legacyPeople);
     const customers = buildCustomers(matchPeople, now);
     await replaceMany(mainDb, COLLECTIONS.customers, customers);
+    const facebookPosts = buildFacebookPosts(now);
+    await replaceMany(mainDb, COLLECTIONS.facebookPosts, facebookPosts);
+    const postByAd = new Map([
+      ["local-content-ad-inner", "post_LOCAL_INNER"],
+      ["local-content-ad-commu", "post_LOCAL_COMMU"],
+      ["local-content-ad-unmapped", "post_LOCAL_UNMAPPED"],
+    ]);
+    const facebookAttribution = await resolvePendingFacebookAttributions(
+      mainDb,
+      async (adId) => postByAd.get(adId) ?? null,
+      now
+    );
     await replaceMany(aiDb, AI_COLLECTIONS.customersScrubbed, customers.map((row) => ({
       ...scrubCustomer(row, now), seedTag: SEED_TAG, synthetic: true,
     })));
@@ -433,7 +482,7 @@ async function main(): Promise<void> {
       });
     }
 
-    const [merges, links, partnerReviews, customerCount, erasedCount, linkStatuses, eventStatuses, matchedLinks, opportunities, salesReport] = await Promise.all([
+    const [merges, links, partnerReviews, customerCount, erasedCount, linkStatuses, eventStatuses, matchedLinks, opportunities, salesReport, storedPosts] = await Promise.all([
       listPendingMergeReviews(mainDb),
       listCustomerLinkReviews(mainDb, aiDb, legacyDb),
       listPartnerReviews(mainDb),
@@ -453,6 +502,7 @@ async function main(): Promise<void> {
       ).toArray(),
       listSalesOpportunities(mainDb, aiDb, legacyDb, now),
       listSalesReport(mainDb, aiDb, legacyDb),
+      mainDb.collection<FacebookPostDoc>(COLLECTIONS.facebookPosts).find({ seedTag: SEED_TAG }).toArray(),
     ]);
     const linkCount = new Map(linkStatuses.map((row) => [row._id, row.count]));
     const eventCount = new Map(eventStatuses.map((row) => [row._id, row.count]));
@@ -472,6 +522,14 @@ async function main(): Promise<void> {
     }
     if (salesReport.summary.newCount < 3 || salesReport.summary.returningCount < 3) {
       throw new Error("ข้อมูล seed ของรายงานการขายต้องมีลูกค้าใหม่และกลับมาซื้ออย่างละอย่างน้อย 3 คน");
+    }
+    const marketingSheet = buildMarketingSheetSnapshot(
+      await mainDb.collection<CustomerDoc>(COLLECTIONS.customers).find({ _id: { $regex: "^cus_LOCAL_" } }).toArray(),
+      storedPosts
+    );
+    const unmappedPosts = storedPosts.filter((post) => post.unmapped).length;
+    if (storedPosts.length < 4 || unmappedPosts < 1 || facebookAttribution.resolved < 2 || facebookAttribution.unresolved < 1) {
+      throw new Error("ข้อมูล seed ของ Facebook content/attribution ไม่ครบเกณฑ์");
     }
 
     const from = "2025-01-01";
@@ -499,6 +557,8 @@ async function main(): Promise<void> {
     console.log(`  Analytics            6/6 metric · รวม ${analyticsRows} แถว`);
     console.log(`  โอกาสการขาย          ตามผล ${opportunities.followUps.length} · upsell ${opportunities.upsells.length}`);
     console.log(`  รายงานการขาย          ใหม่ ${salesReport.summary.newCount} · กลับมาซื้อ ${salesReport.summary.returningCount} · รวม ${salesReport.summary.totalCustomers}`);
+    console.log(`  Facebook posts         ${storedPosts.length} · unmapped ${unmappedPosts} · attribute lead สำเร็จ ${facebookAttribution.resolved} · pending ${facebookAttribution.unresolved}`);
+    console.log(`  ชีตการตลาด             Customers ${marketingSheet.counts.customers} · FB Leads ${marketingSheet.counts.leads} · FB Posts ${marketingSheet.counts.posts}`);
     console.log(`  โปรไฟล์ยืนยันแล้ว    ${customerId(0)}, ${customerId(1)}, ${customerId(2)}`);
     console.log(`  โปรไฟล์ erased       ${customerId(38)}, ${customerId(39)}`);
   } finally {

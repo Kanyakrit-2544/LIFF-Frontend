@@ -17,6 +17,7 @@ export const COLLECTIONS = {
   staffReviewDecisions: "staff_review_decisions",
   recommendationReviews: "recommendation_reviews",
   statusIncidents: "status_incidents",
+  facebookPosts: "facebook_posts",
 } as const;
 
 export const AI_COLLECTIONS = {

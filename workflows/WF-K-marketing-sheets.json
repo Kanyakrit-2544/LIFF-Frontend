@@ -1,0 +1,151 @@
+{
+  "id": "wfk-marketing-sheets",
+  "name": "WF-K — Marketing Sheets Sync",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 10 }] } },
+      "id": "wfk-schedule",
+      "name": "Schedule (10 min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst body = JSON.stringify({});\nconst ts = Math.floor(Date.now() / 1000);\nconst signature = 'sha256=' + crypto.createHmac('sha256', $env.INTERNAL_HMAC_SECRET).update(`${body}.${ts}`).digest('hex');\nreturn [{ json: { body, headers: { 'content-type':'application/json', 'x-signature':signature, 'x-timestamp':String(ts) } } }];"
+      },
+      "id": "wfk-sign",
+      "name": "Sign",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.API_BASE}}/api/internal/sheets/marketing",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "content-type", "value": "={{$json.headers['content-type']}}" },
+          { "name": "x-signature", "value": "={{$json.headers['x-signature']}}" },
+          { "name": "x-timestamp", "value": "={{$json.headers['x-timestamp']}}" }
+        ] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{$json.body}}",
+        "options": { "response": { "response": { "neverError": false } } }
+      },
+      "id": "wfk-snapshot",
+      "name": "Get Marketing Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst sa = JSON.parse($env.GOOGLE_SERVICE_ACCOUNT_JSON);\nconst b64 = (s) => Buffer.from(s).toString('base64url');\nconst now = Math.floor(Date.now() / 1000);\nconst header = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\nconst claim = b64(JSON.stringify({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/spreadsheets', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));\nconst sig = crypto.sign('RSA-SHA256', Buffer.from(`${header}.${claim}`), sa.private_key).toString('base64url');\nreturn [{ json: { assertion: `${header}.${claim}.${sig}` } }];"
+      },
+      "id": "wfk-token-code",
+      "name": "Google Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://oauth2.googleapis.com/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": { "parameters": [
+          { "name": "grant_type", "value": "urn:ietf:params:oauth:grant-type:jwt-bearer" },
+          { "name": "assertion", "value": "={{$json.assertion}}" }
+        ] },
+        "options": {}
+      },
+      "id": "wfk-token",
+      "name": "Get Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{$env.GOOGLE_SHEET_ID_MARKETING}}/values:batchClear",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $('Get Token').first().json.access_token }}" }] },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ranges: ['Customers', 'FB Leads', 'FB Posts'] }) }}",
+        "options": {}
+      },
+      "id": "wfk-clear",
+      "name": "Clear Marketing Tabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "const tabs = $('Get Marketing Snapshot').first().json.tabs || [];\nconst esc = (name) => String(name).replace(/'/g, \"''\");\nconst data = tabs.map((tab) => ({ range: `'${esc(tab.name)}'!A1`, values: tab.values || [] }));\nreturn [{ json: { data } }];"
+      },
+      "id": "wfk-plan",
+      "name": "Plan Writes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{$env.GOOGLE_SHEET_ID_MARKETING}}/values:batchUpdate",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "=Bearer {{ $('Get Token').first().json.access_token }}" },
+          { "name": "content-type", "value": "application/json" }
+        ] },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ valueInputOption: 'RAW', data: $json.data }) }}",
+        "options": {}
+      },
+      "id": "wfk-write",
+      "name": "Write Marketing Tabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Schedule (10 min)": { "main": [[{ "node": "Sign", "type": "main", "index": 0 }]] },
+    "Sign": { "main": [[{ "node": "Get Marketing Snapshot", "type": "main", "index": 0 }]] },
+    "Get Marketing Snapshot": { "main": [[{ "node": "Google Token", "type": "main", "index": 0 }]] },
+    "Google Token": { "main": [[{ "node": "Get Token", "type": "main", "index": 0 }]] },
+    "Get Token": { "main": [[{ "node": "Clear Marketing Tabs", "type": "main", "index": 0 }]] },
+    "Clear Marketing Tabs": { "main": [[{ "node": "Plan Writes", "type": "main", "index": 0 }]] },
+    "Plan Writes": { "main": [[{ "node": "Write Marketing Tabs", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all",
+    "errorWorkflow": "wfe-error-handler"
+  }
+}
